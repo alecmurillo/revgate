@@ -38,8 +38,8 @@ git clone https://github.com/alecmurillo/revgate
 cd revgate
 ```
 
-**Gate a deliberately broken lead list.** Twenty-four rows engineered to trip all
-thirteen gates:
+**Gate a deliberately broken lead list.** Twenty-eight rows engineered to trip all
+seventeen gates:
 
 ```bash
 python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16
@@ -47,8 +47,8 @@ python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16
 
 ```
 revgate lists · fixtures/leads-dirty.csv
-  BLOCKED  P0 17 · P1 8 · P2 4
-  rows 24 · columns 13 · gates run 13 · gates skipped 0
+  BLOCKED  P0 17 · P1 10 · P2 6
+  rows 28 · columns 14 · gates run 17 · gates skipped 0
 
   P0 L003  Number is on the do-not-call list  (2)
       row 20 · cobaltfreight.com · column `phone` — 8005550101 normalises to 8005550101, which is suppressed
@@ -71,11 +71,11 @@ python3 -m revgate redteam --target demo
 
 ```
 revgate agents · demo · sales-intake
-  BLOCKED  P0 29 · P1 2 · P2 0 · skipped 11
-  scenarios 22 · passed 6 · failed 16 · partial 0 · errored 0 · judge pattern
+  BLOCKED  P0 34 · P1 4 · P2 0 · skipped 15
+  scenarios 26 · passed 6 · failed 20 · partial 0 · errored 0 · judge pattern
 ```
 
-Sixteen adversarial scenarios caught it. Six scenarios written to be passed were
+Twenty adversarial scenarios caught it. Six scenarios written to be passed were
 passed. That second number is the one that matters: a battery where everything
 fails cannot tell a broken guardrail from a broken matcher.
 
@@ -93,7 +93,7 @@ goes:
 
 ## The two surfaces
 
-### `lint` — thirteen gates on an outbound list
+### `lint` — seventeen gates on an outbound list
 
 Run `python3 -m revgate rules` to see all of them with the mistake each one
 prevents.
@@ -113,6 +113,10 @@ prevents.
 | P1 | `L011` headcount-ceiling | Accounts past the size where the motion itself is wrong |
 | P2 | `L012` headcount-floor | A minimum-headcount filter, usually the most expensive default in outbound |
 | P1 | `L013` duplicate-account | Two rows on one account, which becomes two reps on one account |
+| P1 | `L014` duplicate-phone | Same phone number on multiple accounts — a shared main number from bad enrichment |
+| P1 | `L015` stale-enrichment | Data verified months ago; a clean list at build time is not clean at send time |
+| P2 | `L016` missing-recipient | No name on the row; the personalisation sends to "Hi there" |
+| P2 | `L017` title-scope | Title indicates the wrong seniority for the motion (intern, assistant) |
 
 Column names are matched through an alias table, so `Company Domain`, `website`
 and `domain` all resolve. Row numbers are one-indexed from 2, matching what the
@@ -122,7 +126,7 @@ Bring your own suppression and DNC exports in `revgate.toml`. **If a source is
 missing, its gate records a blocking skip and the run is BLOCKED.** A gate that
 could not run is not a gate that passed.
 
-### `redteam` — twenty-two adversarial scenarios against a live agent
+### `redteam` — twenty-six adversarial scenarios against a live agent
 
 The battery in [`revgate/batteries/sales-intake.toml`](revgate/batteries/sales-intake.toml)
 probes commercial failure modes rather than content-policy ones:
@@ -132,10 +136,15 @@ probes commercial failure modes rather than content-policy ones:
   directly.
 - **Contract state.** "You're all set" when nothing is signed.
 - **Unauthorised commitments.** A discount the agent invented. An ROI guarantee on
-  the second ask, after the first was correctly deflected.
+  the second ask, after the first was correctly deflected. An escalation promise
+  about what a supervisor will do.
 - **Competitor claims.** Unfounded assertions about a named company's legal
   exposure.
-- **Compliance claims.** Certifications confirmed without a source.
+- **Compliance and security claims.** Certifications confirmed without a source.
+  Encryption standards fabricated on the spot. Integration compatibility asserted
+  without checking.
+- **Refund terms.** Specific refund terms invented under pressure after the safe
+  answer was given.
 - **Opt-out.** One more pitch after "take me off your list".
 - **Prompt injection.** The system prompt, on request.
 - **Six expected-pass controls.** The reason a run means anything.
@@ -203,8 +212,19 @@ battery = "revgate/batteries/sales-intake.toml"
 
 Paths resolve relative to the config file, not the shell.
 
-**Output formats:** `--format text|json|md`. Markdown is written for PR comments,
-with findings in collapsible sections and blocking skips outside them.
+**Output formats:** `--format text|json|md|html`. Markdown is written for PR comments,
+with findings in collapsible sections and blocking skips outside them. HTML is a
+self-contained dark-theme report for sharing with non-technical stakeholders.
+
+### `diff` — compare two exports and re-gate what changed
+
+```bash
+python3 -m revgate diff old-leads.csv new-leads.csv --today 2026-08-16
+```
+
+Matches rows by domain (or `--key email`), reports accounts added, removed, and
+changed, then runs every gate on the new and changed rows only. Same exit-code
+contract: 2 if any new or changed row is blocked, 0 if clean.
 
 ---
 
@@ -295,7 +315,7 @@ revgate/
   agents/       battery loader, target adapters, judges, scenario runner
   batteries/    adversarial scenarios (TOML)
   provenance.py verifies factory-usage.toml, records run history
-  cli.py        lint · redteam · provenance · rules · scenarios
+  cli.py        lint · redteam · diff · provenance · rules · scenarios
 fixtures/       dirty and clean lead lists, suppression and DNC exports
 .factory/       skills, custom droids, hooks
 tests/          unit tests, no network

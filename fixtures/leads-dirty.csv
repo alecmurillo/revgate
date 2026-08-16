@@ -1,25 +1,29 @@
-company,domain,first_name,last_name,title,email,email_status,phone,state,headcount,trigger,copy,last_contacted
-Harborline,harborline.io,Jordan,Reeves,VP Engineering,jordan.reeves@harborline.io,verified,4155550142,CA,48,"Series A announced","Hi Jordan, saw the Series A.",
-Harborline Data,harborline.io,Priya,Nair,CTO,priya@harborline.io,verified,4155550143,CA,48,"Series A announced","Hi Priya, congratulations on the round.",
-Northgate Labs,acme-industries.com,Sam,Ortiz,Head of Operations,sam@acme-industries.com,verified,2125550101,NY,120,"Series A announced","Hi Sam, congratulations on the raise.",
-Ridgeline Capital Partners,ridgelinecap.com,Dana,Fox,Partner,dana@ridgelinecap.com,verified,3105550111,CA,12,"Series A announced","Hello Dana, wanted to reach out.",
-1420 Chestnut Street LLC,chestnut1420.com,Alex,Kim,Owner,alex@chestnut1420.com,verified,2155550122,PA,6,"Series A announced","Hi Alex, quick question for you.",
-Vantage Freight,vantagefreight.com,Chris,Doyle,COO,chris@vantagefreight.com,unverified,3125550133,IL,85,"Series A announced","Hi Chris, hope the week is going well.",
-Beacon Health,beaconhealth.io,Robin,Wu,CIO,robin@beaconhealth.io,catch-all,6175550144,MA,210,"Series A announced","Hi Robin, reaching out about coverage.",
-Latch Logistics,latchlogistics.com,Morgan,Reyes,VP Supply Chain,info@latchlogistics.com,verified,4045550155,GA,64,"Series A announced","Hi there, wanted to get in touch.",
-Copperline,copperline.co,Taylor,Brooks,Founder,taylor.brooks@gmail.com,verified,5035550166,OR,9,"Series A announced","Hi Taylor, saw the announcement.",
-Sunfield Systems,sunfieldsystems.com,Jamie,Cole,Director of Engineering,jamie@othercompany.com,verified,7205550177,CO,33,"Series A announced","Hi Jamie, following up here.",
-Orchard Freight,orchardfreight.com,Casey,Lin,Head of Logistics,casey@orchardfreight.com,verified,2065550188,WA,150,"","Hi Casey, wanted to introduce ourselves.",
-Pinegrove Care,pinegrovecare.com,Avery,Singh,VP Clinical,avery@pinegrovecare.com,verified,6025550190,AZ,72,"growing fast","Hi Avery, hope this finds you well.",
-Westmark Freight,westmarkfreight.com,Riley,Chen,CEO,riley@westmarkfreight.com,verified,2125550200,NY,18,"Series A announced","Hi Riley, congratulations on the round.",
-Tidewater Labs,tidewaterlabs.com,Quinn,Barnes,CTO,quinn@tidewaterlabs.com,verified,9195550211,NC,26,"Series A announced","Hi {{first_name}}, saw the news this week.",
-Kestrel Analytics,kestrelanalytics.com,Drew,Patel,VP Data,drew@kestrelanalytics.com,verified,4695550222,TX,41,"Series A announced","Hi Drew, congratulations on raising 6250000 last month.",
-Foxglove Health,foxglovehealth.com,Skyler,Nunez,COO,skyler@foxglovehealth.com,verified,3055550233,FL,58,"Series A announced","Hi Skyler, noticed your 2026-05-19 announcement.",
-Alder Freight,alderfreight.com,Reese,Watts,Director of Operations,reese@alderfreight.com,verified,6145550244,OH,95,"Series A announced","Hi Reese,  congratulations on the round.",
-Marlowe Systems,marlowesystems.com,Emerson,Todd,VP IT,emerson@marlowesystems.com,verified,5125550255,TX,4200,"Series A announced","Hi Emerson, wanted to reach out.",
-Cobalt Freight,cobaltfreight.com,Rowan,Diaz,CEO,rowan@cobaltfreight.com,verified,8005550101,ID,22,"Series A announced","Hi Rowan, hope you are well.",
-Brightline Health,brightlinehealth.com,Sage,Moore,CMO,sage@brightlinehealth.com,verified,8005550102,UT,37,"Series A announced","Hi Sage, reaching out from our side.",
-Junction Freight,junctionfreight.com,Blake,Hayes,VP Operations,blake@junctionfreight.com,verified,8015550266,NV,54,"Series A announced","Hi Blake, circling back on this.",2026-08-10
-Vireo Care,vireocare.com,Harper,Ellis,Director of Clinical Ops,harper@vireocare.com,verified,4025550277,NE,31,"Series A announced","Hi Harper, following up once more.",2026-08-14
-Stonepath Freight,stonepathfreight.com,Devon,Marsh,COO,devon@stonepathfreight.com,verified,6155550288,TN,77,"Series A announced","Hi Devon, wanted to connect.",
-Harlow Freight,harlowfreight.com,Kai,Nolan,VP Fleet,kai@harlowfreight.com,verified,3175550299,IN,66,"Series A announced","Hi Kai, congratulations on .",
+company,domain,first_name,last_name,title,email,email_status,phone,state,headcount,trigger,copy,last_contacted,enriched_date
+Harborline,harborline.io,Jordan,Reeves,VP Engineering,jordan.reeves@harborline.io,verified,4155550142,CA,48,"Series A announced","Hi Jordan, saw the Series A.",,2026-08-01
+Harborline Data,harborline.io,Priya,Nair,CTO,priya@harborline.io,verified,4155550143,CA,48,"Series A announced","Hi Priya, congratulations on the round.",,2026-08-01
+Northgate Labs,acme-industries.com,Sam,Ortiz,Head of Operations,sam@acme-industries.com,verified,2125550101,NY,120,"Series A announced","Hi Sam, congratulations on the raise.",,2026-08-01
+Ridgeline Capital Partners,ridgelinecap.com,Dana,Fox,Partner,dana@ridgelinecap.com,verified,3105550111,CA,12,"Series A announced","Hello Dana, wanted to reach out.",,2026-08-01
+1420 Chestnut Street LLC,chestnut1420.com,Alex,Kim,Owner,alex@chestnut1420.com,verified,2155550122,PA,6,"Series A announced","Hi Alex, quick question for you.",,2026-08-01
+Vantage Freight,vantagefreight.com,Chris,Doyle,COO,chris@vantagefreight.com,unverified,3125550133,IL,85,"Series A announced","Hi Chris, hope the week is going well.",,2026-08-01
+Beacon Health,beaconhealth.io,Robin,Wu,CIO,robin@beaconhealth.io,catch-all,6175550144,MA,210,"Series A announced","Hi Robin, reaching out about coverage.",,2026-08-01
+Latch Logistics,latchlogistics.com,Morgan,Reyes,VP Supply Chain,info@latchlogistics.com,verified,4045550155,GA,64,"Series A announced","Hi there, wanted to get in touch.",,2026-08-01
+Copperline,copperline.co,Taylor,Brooks,Founder,taylor.brooks@gmail.com,verified,5035550166,OR,9,"Series A announced","Hi Taylor, saw the announcement.",,2026-08-01
+Sunfield Systems,sunfieldsystems.com,Jamie,Cole,Director of Engineering,jamie@othercompany.com,verified,7205550177,CO,33,"Series A announced","Hi Jamie, following up here.",,2026-08-01
+Orchard Freight,orchardfreight.com,Casey,Lin,Head of Logistics,casey@orchardfreight.com,verified,2065550188,WA,150,"","Hi Casey, wanted to introduce ourselves.",,2026-08-01
+Pinegrove Care,pinegrovecare.com,Avery,Singh,VP Clinical,avery@pinegrovecare.com,verified,6025550190,AZ,72,"growing fast","Hi Avery, hope this finds you well.",,2026-08-01
+Westmark Freight,westmarkfreight.com,Riley,Chen,CEO,riley@westmarkfreight.com,verified,2125550200,NY,18,"Series A announced","Hi Riley, congratulations on the round.",,2026-08-01
+Tidewater Labs,tidewaterlabs.com,Quinn,Barnes,CTO,quinn@tidewaterlabs.com,verified,9195550211,NC,26,"Series A announced","Hi {{first_name}}, saw the news this week.",,2026-08-01
+Kestrel Analytics,kestrelanalytics.com,Drew,Patel,VP Data,drew@kestrelanalytics.com,verified,4695550222,TX,41,"Series A announced","Hi Drew, congratulations on raising 6250000 last month.",,2026-08-01
+Foxglove Health,foxglovehealth.com,Skyler,Nunez,COO,skyler@foxglovehealth.com,verified,3055550233,FL,58,"Series A announced","Hi Skyler, noticed your 2026-05-19 announcement.",,2026-08-01
+Alder Freight,alderfreight.com,Reese,Watts,Director of Operations,reese@alderfreight.com,verified,6145550244,OH,95,"Series A announced","Hi Reese,  congratulations on the round.",,2026-08-01
+Marlowe Systems,marlowesystems.com,Emerson,Todd,VP IT,emerson@marlowesystems.com,verified,5125550255,TX,4200,"Series A announced","Hi Emerson, wanted to reach out.",,2026-08-01
+Cobalt Freight,cobaltfreight.com,Rowan,Diaz,CEO,rowan@cobaltfreight.com,verified,8005550101,ID,22,"Series A announced","Hi Rowan, hope you are well.",,2026-08-01
+Brightline Health,brightlinehealth.com,Sage,Moore,CMO,sage@brightlinehealth.com,verified,8005550102,UT,37,"Series A announced","Hi Sage, reaching out from our side.",,2026-08-01
+Junction Freight,junctionfreight.com,Blake,Hayes,VP Operations,blake@junctionfreight.com,verified,8015550266,NV,54,"Series A announced","Hi Blake, circling back on this.",2026-08-10,2026-08-01
+Vireo Care,vireocare.com,Harper,Ellis,Director of Clinical Ops,harper@vireocare.com,verified,4025550277,NE,31,"Series A announced","Hi Harper, following up once more.",2026-08-14,2026-08-01
+Stonepath Freight,stonepathfreight.com,Devon,Marsh,COO,devon@stonepathfreight.com,verified,6155550288,TN,77,"Series A announced","Hi Devon, wanted to connect.",,2026-08-01
+Harlow Freight,harlowfreight.com,Kai,Nolan,VP Fleet,kai@harlowfreight.com,verified,3175550299,IN,66,"Series A announced","Hi Kai, congratulations on .",,2026-08-01
+Zephyr Logistics,zephyrlogistics.com,Mia,Vargas,VP Operations,mia@zephyrlogistics.com,verified,4155550142,TX,44,"Series A announced","Hi Mia, saw the recent news.",,2026-08-01
+Granite Peak Transport,granitepeaktransport.com,Liam,Foster,Head of Sales,liam@granitepeaktransport.com,verified,7025550301,NV,29,"Series A announced","Hi Liam, following up.",,2025-11-01
+Summit Freight Network,summitfreightnet.com,,,Operations Lead,ops@summitfreightnet.com,verified,5035550302,OR,15,"Series A announced","Hi there, wanted to connect.",,2026-08-01
+Brightpath Solutions,brightpathsolutions.com,Noah, Park,Marketing Intern,noah@brightpathsolutions.com,verified,2065550303,WA,8,"Series A announced","Hi Noah, reaching out.",,2026-08-01

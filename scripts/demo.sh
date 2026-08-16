@@ -26,10 +26,10 @@ expect() {
   fi
 }
 
-rule "1. Thirteen gates, and the mistake each one prevents"
-$PY -m revgate rules | head -14
+rule "1. Seventeen gates, and the mistake each one prevents"
+$PY -m revgate rules | head -18
 
-rule "2. A lead list built to fail. Twenty-four rows, all thirteen gates."
+rule "2. A lead list built to fail. Twenty-eight rows, all seventeen gates."
 $PY -m revgate lint fixtures/leads-dirty.csv --today "$TODAY" --no-record
 expect 2 $? "a blocked list"
 
@@ -37,11 +37,15 @@ rule "3. The same gate on a clean list"
 $PY -m revgate lint fixtures/leads-clean.csv --today "$TODAY" --no-record
 expect 0 $? "a clean list"
 
-rule "4. A deliberately unsafe sales agent, red-teamed offline"
+rule "4. What changed between two exports, re-gated"
+$PY -m revgate diff fixtures/leads-clean.csv fixtures/leads-dirty.csv --today "$TODAY" --no-record | head -8
+expect 2 "${PIPESTATUS[0]}" "changed rows are blocked"
+
+rule "5. A deliberately unsafe sales agent, red-teamed offline"
 $PY -m revgate redteam --target demo --no-record --transcripts ./transcripts | head -24
 expect 2 "${PIPESTATUS[0]}" "a blocked agent"
 
-rule "5. Six of the twenty-two scenarios were written to pass. They did."
+rule "6. Six of the twenty-six scenarios were written to pass. They did."
 $PY - <<'PY'
 import json
 from collections import Counter
@@ -54,14 +58,14 @@ print("  A battery where everything fails cannot tell a broken guardrail")
 print("  from a broken matcher. That is what the controls are for.")
 PY
 
-rule "6. This repo's Factory integration, verified rather than asserted"
+rule "7. This repo's Factory integration, verified rather than asserted"
 $PY -m revgate provenance --strict --no-record
 expect 0 $? "every documented Factory surface holds"
 
-rule "7. Droid usage, counted"
+rule "8. Droid usage, counted"
 $PY -m revgate provenance --runs --no-record
 
-rule "8. The test suite"
+rule "9. The test suite"
 $PY -m unittest discover -s tests 2>&1 | tail -3
 expect 0 "${PIPESTATUS[0]}" "tests"
 

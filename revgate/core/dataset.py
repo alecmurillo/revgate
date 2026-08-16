@@ -31,6 +31,7 @@ ALIASES: dict[str, tuple[str, ...]] = {
     "trigger": ("trigger", "whynow", "whycall", "signal", "reason", "reasontocall", "triggerevent"),
     "copy": ("copy", "emailbody", "body", "message", "firstline", "opener", "personalization", "subject", "subjectline"),
     "last_contacted": ("lastcontacted", "noteslastcontacted", "lastactivity", "lasttouch", "lastcontactdate", "lastoutreach"),
+    "enriched_date": ("enricheddate", "lastverified", "dataverified", "verificationdate", "lastenriched", "enrichedon", "dataasof", "lastupdated", "datelastupdated"),
     "owner": ("owner", "assignedto", "rep", "bdr", "accountowner", "dealowner"),
 }
 

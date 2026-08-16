@@ -160,6 +160,22 @@ def cmd_provenance(args: argparse.Namespace) -> int:
     return _finish(result, cfg, args)
 
 
+def cmd_diff(args: argparse.Namespace) -> int:
+    from .lists.diff import diff_lists
+
+    cfg = _base_config(args)
+    only = [t for t in (args.only or "").split(",") if t.strip()] or None
+    try:
+        result = diff_lists(args.old, args.new, cfg, only=only, key_field=args.key)
+    except FileNotFoundError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except ValueError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return _finish(result, cfg, args)
+
+
 def cmd_rules(args: argparse.Namespace) -> int:
     from .lists.rules import RULES
 
@@ -254,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("-c", "--config", help=f"path to a config file (default: nearest revgate.toml)")
-        p.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+        p.add_argument("-f", "--format", choices=("text", "md", "json", "html"), default="text")
         p.add_argument("-o", "--out", help="write the report here instead of stdout")
         p.add_argument("--strict", action="store_true", help="exit 1 on P1 findings as well as P0")
         p.add_argument("--no-record", action="store_true", help="do not append a run record under .revgate/runs")
@@ -284,15 +300,27 @@ def build_parser() -> argparse.ArgumentParser:
     common(prov)
     prov.set_defaults(func=cmd_provenance)
 
+    dif = sub.add_parser("diff", help="compare two lead lists and re-gate the rows that changed")
+    dif.add_argument("old", help="the previous export (baseline)")
+    dif.add_argument("new", help="the new export to check")
+    dif.add_argument("--key", default="domain", choices=("domain", "email", "company"),
+                      help="field to match rows on (default: domain)")
+    dif.add_argument("--suppress", help="CSV of accounts already in play")
+    dif.add_argument("--dnc", help="CSV of suppressed phone numbers")
+    dif.add_argument("--only", help="run only these gates on the changed rows")
+    dif.add_argument("--today", help="pin the reference date (YYYY-MM-DD)")
+    common(dif)
+    dif.set_defaults(func=cmd_diff)
+
     rules = sub.add_parser("rules", help="list the list gates and why each exists")
-    rules.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+    rules.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")  # html not needed for rules
     rules.add_argument("-o", "--out")
     rules.set_defaults(func=cmd_rules)
 
     scen = sub.add_parser("scenarios", help="list the scenarios in a battery")
     scen.add_argument("--battery")
     scen.add_argument("-c", "--config")
-    scen.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+    scen.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")  # html not needed for scenarios
     scen.add_argument("-o", "--out")
     scen.set_defaults(func=cmd_scenarios)
 

@@ -97,7 +97,7 @@ class OutputFormats(unittest.TestCase):
     def test_rules_json_lists_every_gate_with_its_origin(self):
         proc = revgate("rules", "--format", "json")
         payload = json.loads(proc.stdout)
-        self.assertEqual(len(payload), 13)
+        self.assertEqual(len(payload), 17)
         for entry in payload:
             self.assertTrue(entry["origin"].strip())
 
@@ -141,6 +141,55 @@ class Recording(unittest.TestCase):
             payload = json.loads(records[0].read_text())
             self.assertEqual(payload["surface"], "lists")
             self.assertEqual(payload["verdict"], "PASS")
+
+
+class DiffCommand(unittest.TestCase):
+    def test_diff_identical_lists_passes(self):
+        proc = revgate("diff", CLEAN, CLEAN, "--today", TODAY, "--no-record")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("0 new", proc.stdout)
+        self.assertIn("0 removed", proc.stdout)
+        self.assertIn("0 changed", proc.stdout)
+
+    def test_diff_dirty_against_clean_blocks(self):
+        proc = revgate("diff", CLEAN, DIRTY, "--today", TODAY, "--no-record")
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+        self.assertIn("BLOCKED", proc.stdout)
+        self.assertIn("new account(s)", proc.stdout)
+
+    def test_diff_missing_file_is_usage_error(self):
+        proc = revgate("diff", CLEAN, "fixtures/ghost.csv", "--no-record")
+        self.assertEqual(proc.returncode, 3)
+
+    def test_diff_json_includes_diff_stats(self):
+        proc = revgate("diff", CLEAN, DIRTY, "--today", TODAY,
+                       "--format", "json", "--no-record")
+        payload = json.loads(proc.stdout)
+        self.assertIn("added", payload["stats"])
+        self.assertIn("removed", payload["stats"])
+        self.assertIn("changed", payload["stats"])
+        self.assertGreater(payload["stats"]["added"], 0)
+
+
+class HtmlReport(unittest.TestCase):
+    def test_html_is_self_contained(self):
+        proc = revgate("lint", DIRTY, "--today", TODAY, "--format", "html", "--no-record")
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("<!DOCTYPE html>", proc.stdout)
+        self.assertIn("</html>", proc.stdout)
+        self.assertIn("BLOCKED", proc.stdout)
+        self.assertIn("finding", proc.stdout)
+
+    def test_html_out_writes_a_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "report.html"
+            proc = revgate("lint", CLEAN, "--today", TODAY, "--format", "html",
+                           "--out", str(target), "--no-record")
+            self.assertEqual(proc.returncode, 0)
+            self.assertTrue(target.is_file())
+            content = target.read_text()
+            self.assertIn("<!DOCTYPE html>", content)
+            self.assertIn("PASS", content)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,11 @@ DEFAULT_ENTITY_TERMS: tuple[str, ...] = (
     "spv", "lp", "llp", "reit", "acquisition corp", "opportunity zone",
 )
 
+DEFAULT_TITLE_EXCLUDE: tuple[str, ...] = (
+    "intern", "student", "assistant", "trainee", "apprentice", "volunteer",
+    "contractor", "temp", "seasonal",
+)
+
 
 @dataclass
 class Config:
@@ -63,6 +68,8 @@ class Config:
     role_mailboxes: tuple[str, ...] = DEFAULT_ROLE_MAILBOXES
     free_email_domains: tuple[str, ...] = DEFAULT_FREE_EMAIL_DOMAINS
     entity_terms: tuple[str, ...] = DEFAULT_ENTITY_TERMS
+    stale_enrichment_days: int = 90
+    title_exclude_keywords: tuple[str, ...] = DEFAULT_TITLE_EXCLUDE
     today: date | None = None
 
     # sources
@@ -123,12 +130,14 @@ class Config:
         cfg.min_rows_for_distribution_checks = int(
             lint.get("min_rows_for_distribution_checks", cfg.min_rows_for_distribution_checks)
         )
+        cfg.stale_enrichment_days = int(lint.get("stale_enrichment_days", cfg.stale_enrichment_days))
         for key in (
             "generic_triggers",
             "verified_email_statuses",
             "role_mailboxes",
             "free_email_domains",
             "entity_terms",
+            "title_exclude_keywords",
         ):
             if key in lint:
                 setattr(cfg, key, tuple(str(v).lower() for v in lint[key]))

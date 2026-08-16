@@ -707,6 +707,153 @@ def _check_duplicates(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     return out
 
 
+# --------------------------------------------------------------------------
+# L014 — duplicate phone across accounts
+# --------------------------------------------------------------------------
+
+def _check_duplicate_phone(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    rule = "L014"
+    if not ds.has("phone"):
+        ctx.skip(rule, "list has no phone column")
+        return []
+
+    groups: dict[str, list[tuple[int, str]]] = defaultdict(list)
+    for n, row in ds.enumerate_rows():
+        phone = norm_phone(ds.get(row, "phone"))
+        if phone:
+            groups[phone].append((n, ds.label(row)))
+
+    out: list[Finding] = []
+    for phone, entries in sorted(groups.items()):
+        if len(entries) > 1:
+            domains = {label for _, label in entries}
+            if len(domains) > 1:
+                rows_str = ", ".join(f"row {n} ({label})" for n, label in entries)
+                out.append(Finding(
+                    rule=rule, severity=P1,
+                    title="Same phone number on multiple accounts",
+                    detail=f"{phone} appears on {rows_str}",
+                    remedy="Resolve to one account, or confirm this is a shared switchboard and route accordingly.",
+                    origin=(
+                        "A shared main number mapped to every contact is the most common enrichment "
+                        "failure. The dialer reaches a receptionist three times and the rep never knows."
+                    ),
+                    key=phone, column=ds.column("phone"),
+                ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L015 — stale enrichment
+# --------------------------------------------------------------------------
+
+def _check_stale_enrichment(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    rule = "L015"
+    if not ds.has("enriched_date"):
+        ctx.skip(rule, "list has no enrichment-date or last-verified column, so freshness cannot be checked")
+        return []
+
+    today = cfg.reference_date()
+    threshold = cfg.stale_enrichment_days
+    out: list[Finding] = []
+    unparseable = 0
+    for n, row in ds.enumerate_rows():
+        raw = ds.get(row, "enriched_date")
+        if not raw:
+            continue
+        when = parse_date(raw)
+        if when is None:
+            unparseable += 1
+            continue
+        age = (today - when).days
+        if age > threshold:
+            out.append(Finding(
+                rule=rule, severity=P1,
+                title=f"Enrichment is older than {threshold} days",
+                detail=f"last verified {raw} ({age} days ago)",
+                remedy=f"Re-verify before sending, or accept the higher bounce and wrong-number rate that stale data carries.",
+                origin=(
+                    "Enrichment decays. A phone number verified in January is not verified in August. "
+                    "A list that was clean when it was built is not clean when it is sent."
+                ),
+                row=n, key=ds.label(row), column=ds.column("enriched_date"),
+            ))
+    if unparseable:
+        out.append(Finding(
+            rule=rule, severity=P2,
+            title="Enrichment dates that could not be parsed",
+            detail=f"{unparseable} row(s) carry an unrecognised date format and were not gated for freshness",
+            remedy="Normalise the column to YYYY-MM-DD, or those rows bypass the freshness gate entirely.",
+            origin="A gate that cannot read its input reports a pass. Unreadable values are reported, never assumed clean.",
+            column=ds.column("enriched_date"),
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L016 — missing recipient name
+# --------------------------------------------------------------------------
+
+def _check_missing_recipient(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    rule = "L016"
+    has_first = ds.has("first_name")
+    has_last = ds.has("last_name")
+    if not has_first and not has_last:
+        ctx.skip(rule, "list has neither a first-name nor a last-name column")
+        return []
+
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        first = ds.get(row, "first_name") if has_first else ""
+        last = ds.get(row, "last_name") if has_last else ""
+        if not first and not last:
+            out.append(Finding(
+                rule=rule, severity=P2,
+                title="Row has no recipient name",
+                detail="both first and last name are empty",
+                remedy="Enrich the name, or accept that the personalisation will read 'Hi there' and the reply rate will reflect it.",
+                origin=(
+                    "A row with no name sends to 'Hi there' or 'To whom it may concern', which is the "
+                    "same as sending nothing and costs the same."
+                ),
+                row=n, key=ds.label(row),
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L017 — title scope mismatch
+# --------------------------------------------------------------------------
+
+def _check_title_scope(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    rule = "L017"
+    if not ds.has("title"):
+        ctx.skip(rule, "list has no title column")
+        return []
+
+    keywords = {k.lower() for k in cfg.title_exclude_keywords}
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        title = ds.get(row, "title")
+        if not title:
+            continue
+        low = title.lower()
+        hit = next((kw for kw in keywords if re.search(rf"\b{re.escape(kw)}\b", low)), None)
+        if hit:
+            out.append(Finding(
+                rule=rule, severity=P2,
+                title="Title indicates the wrong seniority for this motion",
+                detail=f"title reads {title!r}, which contains {hit!r}",
+                remedy="Route to a different motion, or confirm the individual has buying authority despite the title.",
+                origin=(
+                    "An intern cannot sign a contract and cannot route one. A title that says "
+                    "'assistant' is a gatekeeper worth respecting, not a decision-maker worth pitching."
+                ),
+                row=n, key=ds.label(row), column=ds.column("title"),
+            ))
+    return out
+
+
 RULES: tuple[Rule, ...] = (
     Rule("L001", "suppression-collision", P0,
          "Row already exists in the suppression or CRM source",
@@ -747,6 +894,18 @@ RULES: tuple[Rule, ...] = (
     Rule("L013", "duplicate-account", P1,
          "The same account appears on more than one row",
          "Two rows become two reps on one account.", _check_duplicates),
+    Rule("L014", "duplicate-phone", P1,
+         "Same phone number appears on multiple accounts",
+         "A shared main number is the most common enrichment failure.", _check_duplicate_phone),
+    Rule("L015", "stale-enrichment", P1,
+         "Enrichment data is older than the configured freshness threshold",
+         "A list that was clean when built is not clean when sent.", _check_stale_enrichment),
+    Rule("L016", "missing-recipient", P2,
+         "Row carries no recipient name at all",
+         "A nameless row sends to nobody and costs the same.", _check_missing_recipient),
+    Rule("L017", "title-scope", P2,
+         "Title indicates the wrong seniority for the motion",
+         "An intern cannot sign a contract.", _check_title_scope),
 )
 
 RULES_BY_ID: dict[str, Rule] = {r.id: r for r in RULES}

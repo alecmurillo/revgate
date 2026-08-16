@@ -52,11 +52,17 @@ def select_rules(only: list[str] | None = None) -> list[Rule]:
 
 def run(path: str | Path, cfg: Config, only: list[str] | None = None) -> Result:
     ds = Dataset.load(path, overrides=cfg.columns)
+    return run_on_dataset(ds, cfg, only, target=str(Path(path)))
+
+
+def run_on_dataset(
+    ds: Dataset, cfg: Config, only: list[str] | None = None, *, target: str = "(in-memory)",
+) -> Result:
     ctx = Context()
     _load_sources(cfg, ctx)
 
     rules = select_rules(only)
-    result = Result(surface="lists", target=str(Path(path)))
+    result = Result(surface="lists", target=target)
 
     for rule in rules:
         result.findings.extend(rule.check(ds, cfg, ctx))
