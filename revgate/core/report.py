@@ -298,8 +298,8 @@ def render_html(result: Result, strict: bool = False) -> str:
   .next-steps.pass { border: 1px solid var(--green); }
   .next-steps ul { list-style: none; padding: 0; }
   .next-steps li { padding: .25rem 0; padding-left: 1.25rem; position: relative; }
-  .next-steps li::before { content: "\2192"; position: absolute; left: 0; color: var(--dim); }
-  .next-steps.pass li::before { content: "\2713"; color: var(--green); }
+  .next-steps li::before { content: "\\2192"; position: absolute; left: 0; color: var(--dim); }
+  .next-steps.pass li::before { content: "\\2713"; color: var(--green); }
 </style>
 </head>
 <body>
