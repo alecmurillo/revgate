@@ -482,7 +482,7 @@ python3 -m revgate provenance
 ```
 revgate provenance · factory-usage.toml
   PASS  P0 0 · P1 0 · P2 0
-  claims 10 · verified 10 · surfaces 6
+  claims 11 · verified 11 · surfaces 6
 ```
 
 [`factory-usage.toml`](factory-usage.toml) lists every Factory surface the project

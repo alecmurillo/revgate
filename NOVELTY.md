@@ -74,7 +74,7 @@ exists, this repository should be smaller and should link to it instead.
 
 ---
 
-## The four things we think are genuinely new
+## The five things we think are genuinely new
 
 Each of these is small. Together they are the reason this is a tool rather than a
 checklist in a wiki.
@@ -130,6 +130,25 @@ Plus: each `droid exec` judgement records its `session_id`, so
 We have not seen a repository ship a build step whose job is to falsify its own
 integration claims. It is a small idea and we would like it to be copied.
 
+### 5. Multi-agent audit with parallel sessions and cross-validation
+
+`revgate audit --judge droid` decomposes the audit across multiple `droid exec`
+sessions run in parallel — one per finding group — and then runs a synthesis
+session that cross-validates the individual assessments. Five phases, five
+milestones: planning, pattern gates, parallel review, cross-validation, final
+report.
+
+Multi-agent orchestration frameworks exist (LangGraph, CrewAI, AutoGen). They are
+libraries you build on. This is a concrete, runnable audit where the decomposition
+is driven by the data (one session per rule group), not by a fixed graph. The
+synthesis agent's job is to check the other agents' work, not to evaluate findings
+directly — a separation that makes the cross-validation more than a vote.
+
+The CI workflow runs this on every push to main, producing a visible artifact with
+real session IDs, parallel review counts, and the synthesis verdict. This is the
+proof that droids are making this project what it is: the audit literally cannot
+run without `droid exec`.
+
 ---
 
 ## Adjacent claim: the judge borrows the operator's session
@@ -176,7 +195,11 @@ Every claim above is falsifiable, and the fastest way to find out is to try:
 4. **"The judge needs no second credential."** Read
    [`revgate/agents/judge.py`](revgate/agents/judge.py). If you find a provider key
    or an SDK import, the claim is false.
-5. **All of it.** Run `.factory/droids/origin-auditor.md` against this repository.
+5. **"The multi-agent audit is genuinely new."** Find an open-source tool that
+   decomposes an audit across parallel agent sessions with a cross-validation
+   synthesis step, where the decomposition is driven by the data rather than a
+   fixed graph. One counterexample retires the claim.
+6. **All of it.** Run `.factory/droids/origin-auditor.md` against this repository.
    Its explicit assignment is to attack this document and report every claim that
    is weaker than it reads, and it is instructed to treat a claim it cannot verify
    as a finding rather than giving it the benefit of the doubt.
