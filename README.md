@@ -106,6 +106,44 @@ python3 -m revgate audit fixtures/leads-dirty.csv --judge pattern
 
 ---
 
+### The HTML report
+
+`--format html` produces a self-contained dark-theme report you can share or
+embed in a PR:
+
+```bash
+python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16 --format html --out report.html
+```
+
+![revgate HTML report](assets/report-screenshot.png)
+
+---
+
+### Factory / Droid integration (condensed)
+
+This repo uses Factory in **7 places**, and every claim is **machine-verified**
+rather than asserted:
+
+```bash
+python3 -m revgate provenance    # 12 claims, 12 verified, 6 surfaces
+```
+
+| Surface | What it does |
+|---|---|
+| 2 skills | list-review triage, agent-redteam grouping with control groups |
+| 3 custom droids | list-gate-reviewer, scenario-author, origin-auditor |
+| Hooks | PostToolUse lints on write, PreToolUse blocks bad commits |
+| `droid exec` as judge | semantic assertions via the operator's session, no second API key |
+| Multi-agent audit | parallel `droid exec` sessions with cross-validation synthesis |
+| CI | gate (credential-free), droid-review, docker-smoke, droid-audit |
+| AGENTS.md | project context droid loads on every session |
+
+**Droid as runtime, not dependency.** Everything works without droid. Unjudged
+is never a pass. Full details in the [Factory / Droid integration](#factory--droid-integration)
+section below.
+
+---
+
 ## The two surfaces
 
 ### `lint` — twenty-two gates on an outbound list
@@ -488,11 +526,11 @@ python3 -m revgate provenance
 ```
 revgate provenance · factory-usage.toml
   PASS  P0 0 · P1 0 · P2 0
-  claims 11 · verified 11 · surfaces 6
+  claims 12 · verified 12 · surfaces 6
 ```
 
 [`factory-usage.toml`](factory-usage.toml) lists every Factory surface the project
-says it uses (11 claims). `provenance` validates each claim against the file it names, and then
+says it uses (12 claims). `provenance` validates each claim against the file it names, and then
 walks the repository the other way to flag any Factory surface that exists but is
 undocumented, because a manifest that lags the code stops being evidence.
 
@@ -523,6 +561,11 @@ revgate run history · 41 run(s)
   assertions judged by droid exec: 118
   distinct droid sessions:         37
 ```
+
+Run history is local (under `.revgate/runs/`, gitignored). The numbers above
+are from the author's machine — a fresh clone shows zero. The point is that
+the mechanism exists: every `droid exec` judgement records its `session_id`,
+and `provenance --runs` counts them rather than trusting a README claim.
 
 ---
 

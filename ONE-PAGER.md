@@ -47,7 +47,7 @@ Machine-checks every claim about how the repo uses Factory against the actual fi
 - **Multi-agent audit**: `revgate audit --judge droid` splits the audit across parallel `droid exec` sessions — one per finding group — with a cross-validation synthesis session that checks the other agents' work
 - **CI**: one job asserts exit codes, one `droid exec` job runs reviewer droids on changed gates
 
-All 11 claims in `factory-usage.toml` are machine-verified by `revgate provenance`.
+All 12 claims in `factory-usage.toml` are machine-verified by `revgate provenance`.
 
 ## What's genuinely new (and what isn't)
 
@@ -77,4 +77,4 @@ All 11 claims in `factory-usage.toml` are machine-verified by `revgate provenanc
 
 ## Current state
 
-Pushed to github.com/alecmurillo/revgate. 241 tests pass. Demo asserts all exit codes. Provenance 11/11 verified. CI green.
+Pushed to github.com/alecmurillo/revgate. 241 tests pass. Demo asserts all exit codes. Provenance 12/12 verified. CI green.

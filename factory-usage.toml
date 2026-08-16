@@ -285,3 +285,33 @@ finding group), not by a fixed graph. The synthesis agent's job is to check the
 other agents' work, not to evaluate findings directly — a separation that makes
 the cross-validation more than a vote.
 """
+
+# ---------------------------------------------------------------------------
+# AGENTS.md: project context droid loads on every session
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX12"
+surface = "code"
+path = "AGENTS.md"
+check = "code"
+expect = [
+  "AGENTS.md",
+  "invariant",
+  "droid exec",
+  "provenance",
+  "exit code",
+]
+does = """
+The file droid loads for project context on every session. Documents the one
+invariant (a check that could not run is never a pass), the architecture, how to
+run things, the 7 Factory surfaces, conventions for new gates and scenarios, and
+what not to do. This is the file that makes a droid session productive in this
+codebase without reading the README first.
+"""
+novel = """
+Standard. AGENTS.md is a documented Factory convention. What is unusual is that
+it doubles as a provenance surface: revgate provenance verifies it exists and
+contains the expected markers, so the claim that droid has project context is
+machine-checked rather than asserted.
+"""

@@ -180,7 +180,16 @@ def _ask_droid(prompt: str, timeout: float = 120.0) -> dict[str, Any]:
             return {"error": f"timed out after {timeout}s"}
 
         if proc.returncode != 0:
-            return {"error": f"droid exec exited {proc.returncode}: {(proc.stderr or '').strip()[:200]}"}
+            # droid puts the error reason in the stdout JSON envelope, not stderr.
+            reason = ""
+            try:
+                env = json.loads(proc.stdout or "{}")
+                reason = str(env.get("result") or env.get("error") or "").strip()[:200]
+            except (json.JSONDecodeError, ValueError):
+                pass
+            if not reason:
+                reason = (proc.stderr or "").strip()[:200]
+            return {"error": f"droid exec exited {proc.returncode}: {reason}" if reason else f"droid exec exited {proc.returncode}"}
 
         try:
             envelope = json.loads(proc.stdout or "{}")
