@@ -311,20 +311,12 @@ def audit(
     phases: list[str] = []
     milestones: list[Milestone] = []
 
-    # Phase 1: Pattern gates.
+    # Run pattern gates first to collect the data the plan needs.
     lint_result = run(path, cfg)
     grouped = group_findings(lint_result.findings)
     counts = lint_result.counts()
 
-    phases.append("Phase 1: Pattern gates complete")
-    milestones.append(Milestone(
-        phase="pattern-gates",
-        status="complete",
-        detail=f"{len(grouped)} finding groups across {sum(counts.values())} findings",
-        findings_checked=sum(counts.values()),
-    ))
-
-    # Phase 0: Planning (generated after gates so we know what to review).
+    # Phase 0: Planning (generated from the gate results).
     plan = ReviewPlan(
         total_findings=sum(counts.values()),
         rule_groups=[
@@ -333,11 +325,20 @@ def audit(
         ],
         estimated_sessions=len(grouped) + 1,  # +1 for synthesis
     )
-    phases.insert(0, f"Phase 0: Review plan generated ({plan.estimated_sessions} sessions planned)")
-    milestones.insert(0, Milestone(
+    phases.append(f"Phase 0: Review plan generated ({plan.estimated_sessions} sessions planned)")
+    milestones.append(Milestone(
         phase="planning",
         status="complete",
         detail=f"{plan.total_findings} findings, {len(grouped)} rule groups, {plan.estimated_sessions} sessions",
+    ))
+
+    # Phase 1: Pattern gates (the deterministic baseline).
+    phases.append("Phase 1: Pattern gates complete")
+    milestones.append(Milestone(
+        phase="pattern-gates",
+        status="complete",
+        detail=f"{len(grouped)} finding groups across {sum(counts.values())} findings",
+        findings_checked=sum(counts.values()),
     ))
 
     reviews: list[AgentReview] = []

@@ -23,6 +23,7 @@ def _load_sources(cfg: Config, ctx: Context) -> None:
         except FileNotFoundError:
             ctx.suppression = {"domain": set(), "email": set()}
             ctx.suppression_path = Path(cfg.suppression)
+            ctx.suppression_missing = True
 
     if cfg.dnc is not None:
         try:
@@ -31,6 +32,7 @@ def _load_sources(cfg: Config, ctx: Context) -> None:
         except FileNotFoundError:
             ctx.dnc = set()
             ctx.dnc_path = Path(cfg.dnc)
+            ctx.dnc_missing = True
 
 
 def select_rules(only: list[str] | None = None) -> list[Rule]:

@@ -40,8 +40,10 @@ class Context:
 
     suppression: dict[str, set[str]] | None = None
     suppression_path: Path | None = None
+    suppression_missing: bool = False
     dnc: set[str] | None = None
     dnc_path: Path | None = None
+    dnc_missing: bool = False
     skips: list[Skipped] = field(default_factory=list)
 
     def skip(self, rule: str, reason: str, *, blocking: bool = False) -> None:
@@ -166,12 +168,20 @@ def _check_suppression(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
         ctx.skip(rule, "no suppression source configured; set [lint.sources].suppression or pass --suppress")
         return []
     if not (ctx.suppression.get("domain") or ctx.suppression.get("email")):
-        ctx.skip(
-            rule,
-            f"suppression source {ctx.suppression_path} yielded no domains or emails, "
-            "so every row would pass unchecked",
-            blocking=True,
-        )
+        if ctx.suppression_missing:
+            ctx.skip(
+                rule,
+                f"suppression source {ctx.suppression_path} does not exist; "
+                "check the path in your config",
+                blocking=True,
+            )
+        else:
+            ctx.skip(
+                rule,
+                f"suppression source {ctx.suppression_path} yielded no domains or emails, "
+                "so every row would pass unchecked",
+                blocking=True,
+            )
         return []
     if not ds.has("domain") and not ds.has("email"):
         ctx.skip(rule, "list has neither a domain nor an email column to match on")
@@ -260,12 +270,20 @@ def _check_dnc(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
         ctx.skip(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
         return []
     if not ctx.dnc:
-        ctx.skip(
-            rule,
-            f"do-not-call source {ctx.dnc_path} contained no usable numbers, so every number "
-            "would publish as if it had been checked",
-            blocking=True,
-        )
+        if ctx.dnc_missing:
+            ctx.skip(
+                rule,
+                f"do-not-call source {ctx.dnc_path} does not exist; "
+                "check the path in your config",
+                blocking=True,
+            )
+        else:
+            ctx.skip(
+                rule,
+                f"do-not-call source {ctx.dnc_path} contained no usable numbers, so every number "
+                "would publish as if it had been checked",
+                blocking=True,
+            )
         return []
     if not ds.has("phone"):
         ctx.skip(rule, "list has no phone column to match on")
@@ -916,8 +934,8 @@ def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
             continue
         hour = int(m.group(1))
         # Check state-specific restriction (Connecticut: 9am-8pm)
-        state = ds.get(row, "state").upper()
-        if state == "CT" or state == "CONNECTICUT":
+        state = norm_state(ds.get(row, "state"))
+        if state == "CT":
             start, end = 9, 20
         else:
             start, end = 8, 21

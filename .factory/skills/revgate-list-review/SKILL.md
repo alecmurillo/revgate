@@ -85,7 +85,7 @@ enough that P1 volume matters more than P1 severity.
 
 ## Reference
 
-`python3 -m revgate rules` prints all thirteen gates with the origin of each.
+`python3 -m revgate rules` prints all twenty-two gates with the origin of each.
 Read it before proposing a new gate, and read the config section of the README
 before concluding that a gate is wrong: several are tuned by `revgate.toml`
 rather than being hard-coded.

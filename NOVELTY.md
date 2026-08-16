@@ -61,12 +61,12 @@ and a stranded comma, that public filing sources are majority holding companies
 that pass every firmographic filter and buy nothing, that a minimum-headcount
 filter is usually the most expensive default in the channel.
 
-Writing those thirteen assertions in Great Expectations is a week of work and
-requires already knowing all thirteen. That knowledge is the artefact here.
+Writing those twenty-two assertions in Great Expectations is a week of work and
+requires already knowing all twenty-two. That knowledge is the artefact here.
 
 **Suppression and DNC scrubbing** exists commercially, for example ActiveProspect's
 SuppressionList and the compliance suites bundled into dialler platforms. Those are
-hosted, paid, and closed. They also solve one of the thirteen gates.
+hosted, paid, and closed. They also solve one of the twenty-two gates.
 
 **What we could not find**, as of August 2026, is an open-source, opinionated,
 runnable linter for outbound lead lists with a severity policy attached. If it

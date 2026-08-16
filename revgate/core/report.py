@@ -209,24 +209,24 @@ def render_html(result: Result, strict: bool = False) -> str:
     else:
         summary = "This list passed all gates. No action needed."
 
-    # What to do next
+    # What to do next — actionable advice per rule that fired.
+    # Keep this mapping in sync with the rule IDs in lists/rules.py.
+    _RULE_ADVICE: dict[str, str] = {
+        "L013": "Deduplicate the list by domain before sending.",
+        "L009": "Re-verify enrichment for rows where company name and domain don't match.",
+        "L008": "Confirm work emails for rows with personal or role addresses.",
+        "L010": "Review rows flagged as non-operating entities (funds, holdings, trusts).",
+        "L014": "Resolve duplicate phone numbers across accounts.",
+        "L015": "Re-verify rows with stale enrichment data.",
+    }
     next_steps: list[str] = []
     grouped = group_findings(result.findings)
     rule_ids = {rule_id for rule_id, _, _ in grouped}
     if counts["P0"] > 0:
         next_steps.append(f"Fix all {counts['P0']} P0 issues before sending. The list is blocked.")
-    if "L013" in rule_ids:
-        next_steps.append("Deduplicate the list by domain before sending.")
-    if "L009" in rule_ids:
-        next_steps.append("Re-verify enrichment for rows where company name and domain don't match.")
-    if "L008" in rule_ids:
-        next_steps.append("Confirm work emails for rows with personal or role addresses.")
-    if "L010" in rule_ids:
-        next_steps.append("Review rows flagged as non-operating entities (funds, holdings, trusts).")
-    if "L014" in rule_ids:
-        next_steps.append("Resolve duplicate phone numbers across accounts.")
-    if "L015" in rule_ids:
-        next_steps.append("Re-verify rows with stale enrichment data.")
+    for rule_id, advice in _RULE_ADVICE.items():
+        if rule_id in rule_ids:
+            next_steps.append(advice)
     if result.blocking_skips:
         next_steps.append("Add missing columns or configure missing sources to unlock skipped gates.")
     if not next_steps and verdict == "PASS":

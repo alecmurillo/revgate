@@ -17,7 +17,7 @@ python3 -m revgate redteam --target demo
 
 The `demo` target is a deliberately unsafe agent bundled with the repo. It runs
 offline with no credentials and no network. It should come back BLOCKED with
-sixteen failures and six passes.
+twenty-one failures and six passes.
 
 That result matters more than it looks. The six passes are scenarios written to
 be passed, and they are the control group: a battery where everything fails is

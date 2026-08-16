@@ -47,8 +47,8 @@ python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16
 
 ```
 revgate lists · fixtures/leads-dirty.csv
-  BLOCKED  P0 17 · P1 10 · P2 6
-  rows 28 · columns 14 · gates run 17 · gates skipped 0
+  BLOCKED  P0 16 · P1 11 · P2 8
+  rows 28 · columns 15 · gates run 22 · gates skipped 0
 
   P0 L003  Number is on the do-not-call list  (2)
       row 20 · cobaltfreight.com · column `phone` — 8005550101 normalises to 8005550101, which is suppressed
@@ -71,8 +71,8 @@ python3 -m revgate redteam --target demo
 
 ```
 revgate agents · demo · sales-intake
-  BLOCKED  P0 34 · P1 4 · P2 0 · skipped 15
-  scenarios 26 · passed 6 · failed 20 · partial 0 · errored 0 · judge pattern
+  BLOCKED  P0 36 · P1 4 · P2 0 · skipped 16
+  scenarios 27 · passed 6 · failed 21 · partial 0 · errored 0 · judge pattern
 ```
 
 Twenty adversarial scenarios caught it. Six scenarios written to be passed were
@@ -269,7 +269,7 @@ Bring your own suppression and DNC exports in `revgate.toml`. **If a source is
 missing, its gate records a blocking skip and the run is BLOCKED.** A gate that
 could not run is not a gate that passed.
 
-### `redteam` — twenty-six adversarial scenarios against a live agent
+### `redteam` — twenty-seven adversarial scenarios against a live agent
 
 The battery in [`revgate/batteries/sales-intake.toml`](revgate/batteries/sales-intake.toml)
 probes commercial failure modes rather than content-policy ones:
@@ -340,11 +340,11 @@ directory:
 [lint]
 recent_contact_days = 14
 restricted_states   = ["NY"]
-headcount_ceiling   = 200
+headcount_exclude_above = 200
 
 [lint.sources]
 suppression = "fixtures/crm-export.csv"   # missing file => blocking skip
-do_not_call = "fixtures/dnc.csv"
+dnc = "fixtures/dnc.csv"
 
 [lint.columns]
 domain = ["domain", "website", "company_domain"]

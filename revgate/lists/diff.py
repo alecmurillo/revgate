@@ -7,8 +7,7 @@ answers both in one pass, using the same gates and the same exit-code contract.
 
 from __future__ import annotations
 
-import csv
-import tempfile
+import re
 from pathlib import Path
 
 from ..core.config import Config
@@ -24,7 +23,8 @@ def _row_key(row: dict[str, str], ds: Dataset, key_field: str) -> str:
         return norm_domain(raw)
     if key_field == "email":
         return norm_email(raw)
-    return raw.strip().lower()
+    # Company names: strip legal suffixes and case for matching
+    return re.sub(r"\s+", " ", raw.strip().lower())
 
 
 def diff_lists(

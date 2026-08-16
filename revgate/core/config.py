@@ -132,6 +132,7 @@ class Config:
             lint.get("min_rows_for_distribution_checks", cfg.min_rows_for_distribution_checks)
         )
         cfg.stale_enrichment_days = int(lint.get("stale_enrichment_days", cfg.stale_enrichment_days))
+        cfg.dnc_stale_days = int(lint.get("dnc_stale_days", cfg.dnc_stale_days))
         for key in (
             "generic_triggers",
             "verified_email_statuses",

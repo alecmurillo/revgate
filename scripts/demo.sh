@@ -26,8 +26,8 @@ expect() {
   fi
 }
 
-rule "1. Seventeen gates, and the mistake each one prevents"
-$PY -m revgate rules | head -18
+rule "1. Twenty-two gates, and the mistake each one prevents"
+$PY -m revgate rules
 
 rule "2. A lead list built to fail. Twenty-eight rows, all twenty-two gates."
 $PY -m revgate lint fixtures/leads-dirty.csv --today "$TODAY" --no-record
