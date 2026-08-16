@@ -132,6 +132,135 @@ prevents.
 | P2 | `L016` missing-recipient | No name on the row; the personalisation sends to "Hi there" |
 | P2 | `L017` title-scope | Title indicates the wrong seniority for the motion (intern, assistant) |
 
+## How to read this report
+
+Each gate exists because somebody shipped a list without checking and it cost
+money. The `origin` field on every finding is the mistake, not a description of
+the check. Here is what each gate is based on and why it matters.
+
+### P0 — blocks the send
+
+**L001 suppression-collision.** You're about to spend enrichment credits and rep
+time on accounts you already know about. Worse, two reps end up on the same
+account because nobody checked the suppression list first. The prospect gets two
+emails from your company and loses trust in both.
+
+**L002 recent-contact.** A rep called this person 6 days ago. The CRM's deal stage
+doesn't reflect that because the call didn't move the deal. A second rep reaches
+out. The prospect hears from your company twice in a week and assumes you don't
+talk to each other.
+
+**L003 do-not-call.** This number is on your DNC export. If it reaches a dialer,
+that's a $50,120 statutory violation per call. Flagging it instead of removing it
+assumes every downstream tool reads the flag column — most don't. The row needs
+to be gone, not annotated.
+
+**L004 restricted-jurisdiction.** These accounts are in a state your motion isn't
+cleared for. State telemarketing laws vary wildly: Connecticut is $20,000 per
+violation, Georgia has no damage cap, Texas requires a $10,000 bond. The
+enrichment vendor's UI doesn't show jurisdiction restrictions, so this constraint
+is invisible while you're building the list. You supply the restricted states in
+`revgate.toml` because the restrictions depend on your specific motion.
+
+**L005 missing-trigger.** A trigger column where every row says "series a
+announced" is a segment label, not a trigger. When your email tool merges it into
+the copy, every email says the same thing. The recipient reads "Saw your Series A
+was announced..." and immediately knows they're part of a blast. A trigger should
+be specific enough that two rows in the same list rarely share it. "Growing fast"
+is true of every company a rep has ever called and predicts nothing.
+
+**L006 unrendered-copy.** `{{first_name}}` survived the render and will send
+literally. A machine-formatted date like `2026-05-19` reached the copy instead of
+"May." A merge field that rendered empty left a stranded period. All of these
+signal broken tooling, not personalization. The prospect reads it and knows the
+email was assembled, not written.
+
+**L018 dnc-source-staleness.** Federal law requires scrubbing against the National
+DNC Registry every 31 days. A DNC file that is 60 days old is a historical
+document, not a compliance tool. Numbers added to the DNC list since your last
+scrub are numbers you'll call illegally. The gate checks the modification time of
+your DNC source file.
+
+**L019 calling-hours.** TCPA restricts calling hours to 8am-9pm local time.
+Connecticut requires 9am-8pm with $20,000 per violation. A send scheduled outside
+these hours is a statutory violation regardless of intent — the regulator doesn't
+care that your scheduling tool didn't check.
+
+### P1 — should fix before sending
+
+**L007 email-unverified.** The verification tool said "verified" because the
+domain accepts any address. But catch-all domains accept at the SMTP level and
+bounce at delivery. Enough bounces and your sending domain gets suspended.
+
+**L009 name-domain-mismatch.** The company name says "Northgate Labs" but the
+domain is "acme-industries.com." Enrichment matched the wrong company. If you
+write a first line about Northgate Labs and send it to acme-industries.com, the
+prospect knows you're confused about who they are. Every word in the email is
+now suspect.
+
+**L010 non-operating-entity.** "Ridgeline Capital Partners" is a fund. "1420
+Chestnut Street LLC" is an address wearing a corporate suffix. They pass every
+firmographic filter — they have a website, a headcount, a state. But they don't
+buy software. Public filing sources are full of these, and they inflate your list
+size without adding any reachable buyers.
+
+**L011 headcount-ceiling.** The issue isn't that big companies are bad targets.
+It's that your motion — the cold email, the messaging, the pricing, the sales
+process — is built for a specific size range. At 4,200 employees, the buying
+process goes through procurement, security, and legal. Your SMB pitch sounds
+naive. Your pricing is wrong. Your single-threaded email can't navigate a
+10-stakeholder decision. The motion itself is wrong, and the exclusion should be
+deliberate, not emergent.
+
+**L013 duplicate-account.** Two rows on one account become two reps on one
+account. The prospect gets two emails from the same company, often with different
+messaging. Both reps look like they don't know what their colleague is doing.
+
+**L014 duplicate-phone.** The same phone number on two accounts is almost always a
+shared switchboard that enrichment mapped to every contact. The dialer calls the
+receptionist twice, the rep never reaches either decision-maker, and nobody knows
+why the calls aren't connecting.
+
+**L015 stale-enrichment.** This data was verified 9 months ago. Phone numbers get
+reassigned. Emails change. People leave. If the number was reassigned to someone
+on the DNC list, calling it is a $50K violation. Stale data is both a quality
+problem and a compliance problem.
+
+**L021 links-in-first-email.** Links in first-touch cold emails trigger spam
+filters and lower deliverability. The email is more likely to land in spam than in
+the inbox. Introduce links in follow-up 2 or 3, after the prospect has engaged.
+
+### P2 — worth reviewing
+
+**L008 mailbox-shape.** A role mailbox (info@, sales@) has no owner, so a reply
+sits in a queue nobody checks. A free email (gmail.com) on a B2B list usually
+means the enrichment guessed. An email on the wrong domain means the join was
+wrong upstream.
+
+**L012 headcount-floor.** The smallest company on the list has 6 employees and
+nothing below survived. A minimum-headcount filter is the most expensive default
+in outbound — the smallest companies are often both the largest share of your
+addressable market and the best close rate, because they decide fast and have
+fewer stakeholders. You filtered them out without realizing it.
+
+**L016 missing-recipient.** Both first and last name are empty. The email will
+say "Hi there" or "To whom it may concern." That's the same as sending nothing —
+it costs the same and gets the same reply rate.
+
+**L017 title-scope.** The title is "Marketing Intern." An intern can't sign a
+contract, can't route one, and can't approve budget. Sending a sales pitch to an
+intern wastes the send and trains them to ignore your company.
+
+**L020 email-length.** 175 words. Cold emails over 150 words convert worse. The
+prospect decides whether to read in under 3 seconds — a wall of text gets
+skipped. The first touch should be under 100 words. The goal is a reply, not a
+pitch.
+
+**L022 multiple-ctas.** "Are you free for a call? Let's chat. Let me know if
+you're open to a quick look." Three asks in one email. Multiple CTAs dilute the
+ask and increase cognitive load — the prospect has to decide which question to
+answer, so they answer none. One email, one ask.
+
 Column names are matched through an alias table, so `Company Domain`, `website`
 and `domain` all resolve. Row numbers are one-indexed from 2, matching what the
 operator sees in the spreadsheet.
