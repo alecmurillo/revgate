@@ -39,7 +39,7 @@ cd revgate
 ```
 
 **Gate a deliberately broken lead list.** Twenty-eight rows engineered to trip all
-seventeen gates:
+twenty-two gates:
 
 ```bash
 python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16
@@ -89,11 +89,25 @@ goes:
 ./scripts/demo.sh
 ```
 
+**Start the HTTP gating API** and send it a Clay row from another terminal:
+
+```bash
+# Start the HTTP gating API
+python3 -m revgate serve --port 8000
+
+# In another terminal, send a Clay row
+curl -s localhost:8000/v1/lint -H 'Content-Type: application/json' \
+  -d '{"source":"clay","rows":[{"Company Name":"Acme","Domain":"acme.com","Email":"ops@acme.com","Trigger":"opened new DC","Copy":"Saw the new DC"}]}'
+
+# Multi-agent audit
+python3 -m revgate audit fixtures/leads-dirty.csv --judge pattern
+```
+
 ---
 
 ## The two surfaces
 
-### `lint` — seventeen gates on an outbound list
+### `lint` — twenty-two gates on an outbound list
 
 Run `python3 -m revgate rules` to see all of them with the mistake each one
 prevents.
@@ -228,9 +242,92 @@ contract: 2 if any new or changed row is blocked, 0 if clean.
 
 ---
 
+## HTTP gating API — Clay, HubSpot, Apollo
+
+`POST /v1/lint` accepts JSON from any source, runs the same twenty-two gates, and
+returns a versioned JSON response. The server is stdlib-only (zero dependencies)
+and started with `python3 -m revgate serve --port 8000`.
+
+Auth is a shared secret in the `X-Revgate-Key` header, set with `--key` or
+`$REVGATE_API_KEY`. **Fail-closed at the API level:** a malformed payload, an
+unknown source, or an adapter failure all return BLOCKED, never PASS. The
+invariant that a check which could not run is never a pass extends to the wire.
+
+The response carries per-row writeback fields designed to map straight back into
+the source tool's columns:
+
+- `revgate_status` — `PASS` or `BLOCKED`
+- `revgate_severity` — highest severity that fired (`P0`, `P1`, `P2`, or empty)
+- `revgate_rules` — list of rule codes that fired (e.g. `["L003", "L006"]`)
+- `revgate_summary` — one-line human summary of the findings
+- `revgate_checked_at` — ISO-8601 timestamp of the check
+
+HTTP status branches without parsing the body: **200 for PASS, 422 for BLOCKED.**
+
+Quickstart:
+
+```bash
+# Start the server
+python3 -m revgate serve --port 8000
+
+# Send a Clay-style row
+curl -s localhost:8000/v1/lint \
+  -H 'Content-Type: application/json' \
+  -d '{"source":"clay","rows":[{"Company Name":"Acme","Domain":"acme.com","Email":"ops@acme.com","Trigger":"opened new DC","Copy":"Saw the new DC"}]}'
+```
+
+Adapters, one per source, normalise the inbound shape into the row the gates
+expect:
+
+| Source | Payload format | What the adapter does |
+|---|---|---|
+| `clay` | `{"rows": [{...}]}` or flat object | Passes Clay row fields through the alias table |
+| `hubspot` | `{"contact": {"properties": {...}}, "company": {"properties": {...}}}` | Flattens contact + company properties (handles both `{value: "..."}` and flat formats) |
+| `apollo` | `{"prospect": {"email": "...", "organization": {...}}}` | Flattens prospect + organization fields |
+| `generic` | `{"rows": [{...}]}` | Passes fields directly through the alias table |
+
+The Clay workflow, in under sixty seconds:
+
+1. Start `revgate serve`.
+2. In Clay, add a webhook column that sends row data to `http://your-host:8000/v1/lint`.
+3. Map the response fields (`revgate_status`, `revgate_severity`, `revgate_rules`,
+   `revgate_summary`, `revgate_checked_at`) to Clay columns.
+4. Filter: only rows where `revgate_status == PASS` proceed to outbound.
+
+Fixtures for each adapter live in `fixtures/api/`. `revgate serve` must be
+reachable from the internet — use ngrok for local testing and a TLS proxy for
+production.
+
+---
+
+## Multi-agent audit
+
+`revgate audit leads.csv --judge droid` runs a three-phase multi-agent workflow:
+
+- **Phase 1 — Pattern gates.** The existing twenty-two gates, no agent. Same
+  findings `lint` produces.
+- **Phase 2 — Agent review.** Findings are grouped by rule, and each group is
+  delegated to a separate `droid exec` session that reviews for true positives,
+  false positives, and remediation. This is a task split across agents with clear
+  milestones: each rule group is a separate session, and each session is a
+  milestone.
+- **Phase 3 — Synthesis.** Agent assessments are collected into a final report.
+
+If `droid` is not available, phase 2 reports its findings as unjudged and the
+audit blocks — fail-closed, the same invariant as everywhere else. The agent
+review is not decorative.
+
+`--judge pattern` (the default) runs phase 1 only and is equivalent to `lint`:
+
+```bash
+python3 -m revgate audit fixtures/leads-dirty.csv --judge pattern
+```
+
+---
+
 ## Factory / Droid integration
 
-This repository uses Factory in five places, and **the claims are machine-checked
+This repository uses Factory in six places, and **the claims are machine-checked
 rather than asserted**:
 
 ```bash
@@ -254,6 +351,7 @@ undocumented, because a manifest that lags the code stops being evidence.
 | **3 custom droids** | `list-gate-reviewer` blocks any gate that can pass a row it never evaluated. `scenario-author` writes scenarios and validates them against the unsafe demo agent. `origin-auditor` attacks this repository's own claims, including [NOVELTY.md](NOVELTY.md). |
 | **Hooks** | `PostToolUse` lints a lead-list CSV the moment it is written. `PreToolUse` refuses a `git commit` that would stage a blocked list. |
 | **`droid exec`** | `--judge droid` delegates assertions no regex can make to the operator's existing Droid session. No second API key. Every judgement records its `session_id`. |
+| **Multi-agent audit** | `revgate audit --judge droid` splits the audit across multiple `droid exec` sessions — one per finding group — with each session reviewing for true positives and false positives. This is a task decomposed across agents with clear milestones: pattern gates (milestone 1), per-rule agent reviews (milestones 2-N), synthesis (final milestone). |
 | **CI** | One credential-free job asserting the exit-code contract, one `droid exec` job that runs the reviewer droids on changed gates. |
 
 **Droid as runtime, not dependency.** The semantic judge shells out to
@@ -302,6 +400,14 @@ Giskard), the lead-list surface appears to be empty, and the four things we thin
 are genuinely new are small and specific. It names the prior art, states what this
 project does **not** claim, and lists how to disprove each remaining claim.
 
+Two notes on the newer surfaces:
+
+- The HTTP gating API with per-source adapters is a standard integration pattern.
+  What's unusual is that the fail-closed invariant extends to the API level: a
+  malformed payload returns BLOCKED, not PASS.
+- The multi-agent audit is a standard orchestration pattern. What's unusual is
+  that unjudged findings block — the agent review is not decorative.
+
 Read that before deciding what this is worth.
 
 ---
@@ -311,10 +417,12 @@ Read that before deciding what this is worth.
 ```
 revgate/
   core/         findings, severity, CSV loading and normalisation, reporters, config
-  lists/        the seventeen gates and their runner
+  lists/        the twenty-two gates and their runner
   agents/       battery loader, target adapters, judges, scenario runner
   batteries/    adversarial scenarios (TOML)
+  api/          HTTP gating server, source adapters (Clay/HubSpot/Apollo)
   provenance.py verifies factory-usage.toml, records run history
+  audit.py      multi-agent audit: pattern gates + droid exec review
   cli.py        lint · redteam · diff · provenance · rules · scenarios
 fixtures/       dirty and clean lead lists, suppression and DNC exports
 .factory/       skills, custom droids, hooks

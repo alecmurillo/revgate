@@ -1,0 +1,24 @@
+{
+  "source": "hubspot",
+  "contact": {
+    "vid": 98765,
+    "properties": {
+      "firstname": "Sarah",
+      "lastname": "Chen",
+      "email": "sarah@brightpath.io",
+      "phone": "+1 415 555 0188",
+      "jobtitle": "Director of Freight"
+    }
+  },
+  "company": {
+    "companyId": 4321,
+    "properties": {
+      "name": "Brightpath Solutions",
+      "domain": "brightpath.io",
+      "state": "TX",
+      "numberofemployees": "85",
+      "trigger": "opened new distribution center",
+      "copy": "Saw the new distribution center — congrats on the expansion."
+    }
+  }
+}

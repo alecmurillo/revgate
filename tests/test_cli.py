@@ -97,7 +97,7 @@ class OutputFormats(unittest.TestCase):
     def test_rules_json_lists_every_gate_with_its_origin(self):
         proc = revgate("rules", "--format", "json")
         payload = json.loads(proc.stdout)
-        self.assertEqual(len(payload), 17)
+        self.assertEqual(len(payload), 22)
         for entry in payload:
             self.assertTrue(entry["origin"].strip())
 

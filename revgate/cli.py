@@ -256,6 +256,39 @@ def cmd_scenarios(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from .api.server import serve
+
+    cfg = _base_config(args)
+    key = args.key or __import__("os").environ.get("REVGATE_API_KEY", "")
+    serve(port=args.port, auth_key=key or None, config=cfg)
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    from .audit import audit, render_audit_text, render_audit_json
+
+    cfg = _base_config(args)
+    use_droid = args.judge == "droid"
+    try:
+        result = audit(args.leads, cfg, use_droid=use_droid)
+    except FileNotFoundError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except ValueError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    if args.format == "json":
+        print(render_audit_json(result, cfg.strict))
+    else:
+        print(render_audit_text(result, cfg.strict))
+
+    if not args.no_record:
+        provenance_mod.record_run(cfg, result.lint_result)
+    return result.exit_code
+
+
 # --------------------------------------------------------------------------
 # parser
 # --------------------------------------------------------------------------
@@ -323,6 +356,23 @@ def build_parser() -> argparse.ArgumentParser:
     scen.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")  # html not needed for scenarios
     scen.add_argument("-o", "--out")
     scen.set_defaults(func=cmd_scenarios)
+
+    srv = sub.add_parser("serve", help="run the HTTP gating API for Clay/HubSpot/Apollo webhooks")
+    srv.add_argument("--port", type=int, default=8000, help="port to listen on (default: 8000)")
+    srv.add_argument("--key", help="shared secret for X-Revgate-Key auth (default: $REVGATE_API_KEY)")
+    srv.add_argument("-c", "--config")
+    srv.set_defaults(func=cmd_serve)
+
+    aud = sub.add_parser("audit", help="multi-agent audit: pattern gates + droid exec review")
+    aud.add_argument("leads", help="CSV of leads to audit")
+    aud.add_argument("--judge", choices=("pattern", "droid"), default="pattern",
+                      help="pattern only (default) or add droid exec review per finding group")
+    aud.add_argument("--suppress", help="CSV of accounts already in play")
+    aud.add_argument("--dnc", help="CSV of suppressed phone numbers")
+    aud.add_argument("--only", help="run only these gates, e.g. L001,L003")
+    aud.add_argument("--today", help="pin the reference date (YYYY-MM-DD)")
+    common(aud)
+    aud.set_defaults(func=cmd_audit)
 
     return parser
 

@@ -33,6 +33,7 @@ ALIASES: dict[str, tuple[str, ...]] = {
     "last_contacted": ("lastcontacted", "noteslastcontacted", "lastactivity", "lasttouch", "lastcontactdate", "lastoutreach"),
     "enriched_date": ("enricheddate", "lastverified", "dataverified", "verificationdate", "lastenriched", "enrichedon", "dataasof", "lastupdated", "datelastupdated"),
     "owner": ("owner", "assignedto", "rep", "bdr", "accountowner", "dealowner"),
+    "send_time": ("sendtime", "calltime", "sendat", "scheduledtime", "scheduledat", "deliverytime", "deliveryat", "senddatetime", "calldatetime"),
 }
 
 
@@ -108,6 +109,24 @@ class Dataset:
             headers = [h for h in (reader.fieldnames or []) if h is not None]
             rows = [{(k or ""): (v if v is not None else "") for k, v in row.items()} for row in reader]
         ds = cls(path=p, headers=headers, rows=rows)
+        ds.mapping = ds._resolve(overrides or {})
+        return ds
+
+    @classmethod
+    def from_rows(
+        cls,
+        rows: list[dict[str, str]],
+        overrides: dict[str, str] | None = None,
+    ) -> "Dataset":
+        """Build a Dataset from in-memory rows (the API path, not a CSV file).
+
+        The same alias resolution runs against whatever field names the calling
+        system sent, so a Clay row with ``"Company Name"`` and a HubSpot webhook
+        with ``contact.properties.name`` both resolve to the ``company`` logical
+        field without the gate layer knowing which system it came from.
+        """
+        headers = sorted({k for row in rows for k in row})
+        ds = cls(path=Path("(api)"), headers=headers, rows=rows)
         ds.mapping = ds._resolve(overrides or {})
         return ds
 

@@ -854,6 +854,193 @@ def _check_title_scope(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     return out
 
 
+# --------------------------------------------------------------------------
+# L018 — DNC source staleness
+# --------------------------------------------------------------------------
+
+def _check_dnc_staleness(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    """DNC source file must be scrubbed within the last 31 days."""
+    rule = "L018"
+    if ctx.dnc_path is None or ctx.dnc is None:
+        ctx.skip(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
+        return []
+
+    import os
+    try:
+        mtime = os.path.getmtime(ctx.dnc_path)
+    except OSError:
+        ctx.skip(rule, f"could not read modification time of {ctx.dnc_path}", blocking=True)
+        return []
+
+    from datetime import datetime, timezone
+    file_date = datetime.fromtimestamp(mtime, tz=timezone.utc).date()
+    ref_date = cfg.reference_date()
+    age_days = (ref_date - file_date).days
+
+    max_days = getattr(cfg, 'dnc_stale_days', 31)
+    if age_days > max_days:
+        return [Finding(
+            rule=rule, severity=P0,
+            title="Do-not-call source is stale",
+            detail=f"DNC source last modified {age_days} days ago (limit: {max_days} days). A stale DNC list means numbers may have been added since the last scrub.",
+            remedy=f"Re-export and re-scrub the DNC list. Federal law requires scrubbing every 31 days; a list older than that is a compliance liability.",
+            origin=(
+                "Federal law requires scrubbing against the National DNC Registry at least every 31 days. "
+                "A DNC file that is 60 days old is not a DNC file — it is a historical document. "
+                "Calling a number added to the DNC list since the last scrub is a $50,120 violation per call."
+            ),
+            row=None, key=str(ctx.dnc_path),
+        )]
+    return []
+
+
+# --------------------------------------------------------------------------
+# L019 — calling hours
+# --------------------------------------------------------------------------
+
+def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    """Send/call time must fall within legal calling hours (8am-9pm local)."""
+    rule = "L019"
+    if not ds.has("send_time"):
+        ctx.skip(rule, "list has no send-time column; calling hours cannot be checked")
+        return []
+
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        raw = ds.get(row, "send_time")
+        if not raw:
+            continue
+        # Parse time — accept HH:MM, HH:MM:SS, or ISO datetime
+        m = re.search(r"(\d{1,2}):(\d{2})", raw)
+        if not m:
+            continue
+        hour = int(m.group(1))
+        # Check state-specific restriction (Connecticut: 9am-8pm)
+        state = ds.get(row, "state").upper()
+        if state == "CT" or state == "CONNECTICUT":
+            start, end = 9, 20
+        else:
+            start, end = 8, 21
+        if hour < start or hour >= end:
+            out.append(Finding(
+                rule=rule, severity=P0,
+                title="Send time outside legal calling hours",
+                detail=f"send_time {raw} is outside legal hours ({start}:00-{end}:00{(' CT' if state in ('CT','CONNECTICUT') else '')})",
+                remedy=f"Move the send time to within {start}:00-{end}:00 local time for this recipient's jurisdiction.",
+                origin=(
+                    "TCPA restricts calling hours to 8 a.m.-9 p.m. local time. "
+                    "Connecticut requires 9 a.m.-8 p.m. with $20,000 per violation. "
+                    "A send scheduled outside these hours is a statutory violation regardless of intent."
+                ),
+                row=n, key=ds.label(row), column=ds.column("send_time"),
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L020 — email length
+# --------------------------------------------------------------------------
+
+def _check_email_length(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    """Copy should be under 150 words for a first-touch email."""
+    rule = "L020"
+    if not ds.has("copy"):
+        ctx.skip(rule, "list has no copy column")
+        return []
+
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        copy = ds.get(row, "copy")
+        if not copy:
+            continue
+        words = len(copy.split())
+        if words > 150:
+            out.append(Finding(
+                rule=rule, severity=P2,
+                title="Copy exceeds 150 words",
+                detail=f"copy is {words} words; first-touch emails over 150 words convert worse than shorter versions",
+                remedy="Cut to under 100 words. The goal is a reply, not a pitch. Reserve depth for follow-ups.",
+                origin=(
+                    "Cold emails exceeding 150 words convert worse than shorter versions (SalesLoft benchmarks). "
+                    "The first touch should be under 100 words. The goal is a reply, not a close."
+                ),
+                row=n, key=ds.label(row), column=ds.column("copy"),
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L021 — links in first email
+# --------------------------------------------------------------------------
+
+def _check_links_in_copy(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    """First-touch copy should not contain links or images."""
+    rule = "L021"
+    if not ds.has("copy"):
+        ctx.skip(rule, "list has no copy column")
+        return []
+
+    _URL_RE = re.compile(r"https?://|www\.\w+\.\w{2,}", re.IGNORECASE)
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        copy = ds.get(row, "copy")
+        if not copy:
+            continue
+        if _URL_RE.search(copy):
+            out.append(Finding(
+                rule=rule, severity=P1,
+                title="Copy contains a link or URL",
+                detail=f"copy contains a URL; links in first-touch emails trigger spam filters and lower deliverability",
+                remedy="Remove links from the first email. Introduce case study links in follow-up 2 or 3, after the prospect has engaged.",
+                origin=(
+                    "Links and images trigger spam filters and lower deliverability on cold outreach (SyncGTM 2026). "
+                    "Avoid both in the first email. Introduce content references in follow-ups after engagement."
+                ),
+                row=n, key=ds.label(row), column=ds.column("copy"),
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# L022 — multiple CTAs
+# --------------------------------------------------------------------------
+
+def _check_multiple_ctas(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
+    """Copy should contain exactly one call-to-action."""
+    rule = "L022"
+    if not ds.has("copy"):
+        ctx.skip(rule, "list has no copy column")
+        return []
+
+    _CTA_RE = re.compile(
+        r"\b(schedule|book|let'?s (chat|talk|connect)|are you free|can we (talk|chat|connect)|"
+        r"reply (if|to)|let me know if|open to|worth a (call|chat|look)|"
+        r"free for|grab time|set up a? (call|meeting|time))\b",
+        re.IGNORECASE,
+    )
+    out: list[Finding] = []
+    for n, row in ds.enumerate_rows():
+        copy = ds.get(row, "copy")
+        if not copy:
+            continue
+        # findall would return tuples of capture groups here, so use finditer and
+        # take the full match text instead — the detail line joins these as strings.
+        matches = [m.group(0) for m in _CTA_RE.finditer(copy)]
+        if len(matches) > 1:
+            out.append(Finding(
+                rule=rule, severity=P2,
+                title="Copy contains multiple calls-to-action",
+                detail=f"copy has {len(matches)} CTAs ({', '.join(matches[:3])}); multiple CTAs dilute the ask and increase cognitive load",
+                remedy="Use exactly one CTA per email. One email, one ask. Make it low-friction: a yes/no question or a short reply.",
+                origin=(
+                    "Multiple CTAs dilute the ask and increase cognitive load (SyncGTM 2026). "
+                    "One email, one ask. The ask should be low-friction for a first touch."
+                ),
+                row=n, key=ds.label(row), column=ds.column("copy"),
+            ))
+    return out
+
+
 RULES: tuple[Rule, ...] = (
     Rule("L001", "suppression-collision", P0,
          "Row already exists in the suppression or CRM source",
@@ -906,6 +1093,21 @@ RULES: tuple[Rule, ...] = (
     Rule("L017", "title-scope", P2,
          "Title indicates the wrong seniority for the motion",
          "An intern cannot sign a contract.", _check_title_scope),
+    Rule("L018", "dnc-source-staleness", P0,
+         "DNC source file is older than the legal scrubbing interval",
+         "A stale DNC list is a historical document, not a compliance tool.", _check_dnc_staleness),
+    Rule("L019", "calling-hours", P0,
+         "Send time falls outside legal calling hours for the recipient's jurisdiction",
+         "TCPA calling hours are a statutory requirement.", _check_calling_hours),
+    Rule("L020", "email-length", P2,
+         "Copy exceeds 150 words for a first-touch email",
+         "The goal is a reply, not a pitch.", _check_email_length),
+    Rule("L021", "links-in-first-email", P1,
+         "Copy contains a link or URL in a first-touch email",
+         "Links trigger spam filters on cold outreach.", _check_links_in_copy),
+    Rule("L022", "multiple-ctas", P2,
+         "Copy contains more than one call-to-action",
+         "One email, one ask.", _check_multiple_ctas),
 )
 
 RULES_BY_ID: dict[str, Rule] = {r.id: r for r in RULES}

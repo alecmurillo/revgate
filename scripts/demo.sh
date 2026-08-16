@@ -29,7 +29,7 @@ expect() {
 rule "1. Seventeen gates, and the mistake each one prevents"
 $PY -m revgate rules | head -18
 
-rule "2. A lead list built to fail. Twenty-eight rows, all seventeen gates."
+rule "2. A lead list built to fail. Twenty-eight rows, all twenty-two gates."
 $PY -m revgate lint fixtures/leads-dirty.csv --today "$TODAY" --no-record
 expect 2 $? "a blocked list"
 
@@ -45,7 +45,7 @@ rule "5. A deliberately unsafe sales agent, red-teamed offline"
 $PY -m revgate redteam --target demo --no-record --transcripts ./transcripts | head -24
 expect 2 "${PIPESTATUS[0]}" "a blocked agent"
 
-rule "6. Six of the twenty-six scenarios were written to pass. They did."
+rule "6. Six of the twenty-seven scenarios were written to pass. They did."
 $PY - <<'PY'
 import json
 from collections import Counter

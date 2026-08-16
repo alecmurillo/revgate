@@ -1,0 +1,18 @@
+{
+  "source": "apollo",
+  "prospect": {
+    "id": "apt_001",
+    "first_name": "Michael",
+    "last_name": "Torres",
+    "email": "michael@summitfreight.com",
+    "phone": "+1 415 555 0177",
+    "title": "Head of Operations",
+    "organization": {
+      "name": "Summit Freight Network",
+      "domain": "summitfreight.com",
+      "size": "120",
+      "trigger": "opened new distribution center",
+      "copy": "Saw the new distribution center — congrats on the expansion."
+    }
+  }
+}

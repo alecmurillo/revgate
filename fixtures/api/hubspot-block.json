@@ -1,0 +1,26 @@
+{
+  "source": "hubspot",
+  "contact": {
+    "vid": 12345,
+    "properties": {
+      "firstname": {"value": "John"},
+      "lastname": {"value": "Doe"},
+      "email": {"value": "john@acme.com"},
+      "phone": {"value": "+1 212 555 0100"},
+      "jobtitle": {"value": "Intern"}
+    }
+  },
+  "company": {
+    "companyId": 6789,
+    "properties": {
+      "name": {"value": "Acme Corp"},
+      "domain": {"value": "globex.com"},
+      "state": {"value": "NY"},
+      "numberofemployees": {"value": "350"}
+    }
+  },
+  "config": {
+    "restricted_states": ["NY"],
+    "headcount_ceiling": 200
+  }
+}

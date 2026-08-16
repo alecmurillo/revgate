@@ -69,6 +69,7 @@ class Config:
     free_email_domains: tuple[str, ...] = DEFAULT_FREE_EMAIL_DOMAINS
     entity_terms: tuple[str, ...] = DEFAULT_ENTITY_TERMS
     stale_enrichment_days: int = 90
+    dnc_stale_days: int = 31
     title_exclude_keywords: tuple[str, ...] = DEFAULT_TITLE_EXCLUDE
     today: date | None = None
 

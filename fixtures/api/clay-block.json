@@ -1,0 +1,21 @@
+{
+  "source": "clay",
+  "rows": [
+    {
+      "_external_id": "clay-row-002",
+      "Company Name": "Granite Peak Capital",
+      "Domain": "granitepeak.fund",
+      "Email": "info@granitepeak.fund",
+      "Phone": "+1 212 555 0100",
+      "State": "NY",
+      "Headcount": "12",
+      "Title": "Associate",
+      "Trigger": "good fit",
+      "Enriched Date": "2025-01-15"
+    }
+  ],
+  "config": {
+    "restricted_states": ["NY"],
+    "headcount_ceiling": 200
+  }
+}

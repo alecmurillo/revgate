@@ -1,4 +1,4 @@
-"""The thirteen gates, exercised against the shipped fixtures.
+"""The twenty-two gates, exercised against the shipped fixtures.
 
 Two assertions carry most of the weight:
 
@@ -45,11 +45,26 @@ class DirtyFixture(unittest.TestCase):
 
     def test_every_gate_has_a_row_that_trips_it(self):
         fired = {f.rule for f in self.result.findings}
-        never_fired = sorted({r.id for r in RULES} - fired)
+        # L018 is a source-level gate: it inspects the DNC source file's
+        # modification time, not any row in the lead list, so no row in the
+        # fixture can trip it. It is exercised separately by
+        # test_dnc_staleness_fires_with_zero_threshold.
+        row_level_rules = {r.id for r in RULES if r.id != "L018"}
+        never_fired = sorted(row_level_rules - fired)
         self.assertEqual(
             never_fired, [],
             f"gates with no exercising row in the dirty fixture: {never_fired}",
         )
+
+    def test_dnc_staleness_fires_with_zero_threshold(self):
+        """L018 is a source-level gate, not a row-level gate. Test it separately."""
+        cfg = Config.load(REPO / "revgate.toml")
+        # Pin today beyond the DNC file's mtime so a zero-day threshold must
+        # fire regardless of when the fixture was last touched.
+        cfg = cfg.with_overrides(dnc_stale_days=0, today=date(2027, 1, 1))
+        result = runner.run(CLEAN, cfg, only=["L018"])
+        l018_findings = [f for f in result.findings if f.rule == "L018"]
+        self.assertGreater(len(l018_findings), 0)
 
     def test_nothing_was_skipped(self):
         # Every source the config names exists, so a skip here means a real defect.

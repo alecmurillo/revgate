@@ -10,7 +10,7 @@ A lead list is code that runs once, against real people, and cannot be rolled ba
 
 ## What it does
 
-### `revgate lint` — 17 gates on an outbound lead list
+### `revgate lint` — 22 gates on an outbound lead list
 
 Checks a CSV before it reaches a dialer or sending tool: suppression collisions, do-not-call numbers, restricted jurisdictions, unrendered merge fields, stale enrichment, duplicate phones across accounts, missing recipient names, wrong-seniority titles, and more. Each gate carries the specific mistake it prevents, printed in the report.
 
@@ -56,11 +56,11 @@ All 10 claims in `factory-usage.toml` are machine-verified by `revgate provenanc
 
 - Zero dependencies, zero credentials for the default path
 - Python 3.11+, stdlib only
-- 154 tests, no network
+- 208 tests, no network
 - Exit codes: 0 clean, 1 advisory+strict, 2 blocked, 3 usage error
 - Bundled demo agent runs offline and deterministic
 - Output: text, JSON, Markdown (for PR comments), HTML (for sharing)
 
 ## Current state
 
-2 commits on `main`. Local only, no remote. 154 tests pass. Demo asserts all exit codes. Provenance 10/10 verified. Never run against a real agent or a real lead list.
+2 commits on `main`. Local only, no remote. 208 tests pass. Demo asserts all exit codes. Provenance 10/10 verified. Never run against a real agent or a real lead list.
