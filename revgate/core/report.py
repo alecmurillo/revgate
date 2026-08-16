@@ -194,6 +194,68 @@ def render_html(result: Result, strict: bool = False) -> str:
     def esc(text: str) -> str:
         return html_mod.escape(str(text))
 
+    # Logical column(s) a gate needs so it can run. Shown next to "not checked"
+    # skips so the reader knows what to add to the file to unlock each gate.
+    gate_columns: dict[str, str] = {
+        "L002": "last-contacted",
+        "L004": "state",
+        "L005": "copy or trigger",
+        "L006": "copy or trigger",
+        "L007": "email-verification status",
+        "L008": "email",
+        "L009": "company and domain",
+        "L010": "company",
+        "L011": "headcount",
+        "L012": "headcount",
+        "L013": "domain",
+        "L014": "phone",
+        "L015": "enrichment-date or last-verified",
+        "L016": "first-name or last-name",
+        "L017": "title",
+    }
+
+    total_rows = result.stats.get("rows")
+    total_rows = total_rows if isinstance(total_rows, int) else None
+
+    def pct(n: int) -> str:
+        if total_rows and total_rows > 0:
+            return f"{n} — {round(n / total_rows * 100)}% of list"
+        return f"{n}"
+
+    # Plain-English explanation of what the verdict means.
+    if verdict == "BLOCKED":
+        summary = (
+            f"This list cannot be sent as-is. {counts['P0']} row(s) have blocking "
+            f"issues that must be fixed first."
+        )
+    elif verdict == "ADVISORY":
+        flagged = counts["P1"] + counts["P2"]
+        summary = f"This list can be sent, but {flagged} row(s) have issues worth reviewing."
+    else:
+        summary = "This list passed all gates."
+
+    # Actionable next steps derived from what actually fired.
+    fired_rules = {f.rule for f in result.findings}
+    has_p0 = counts["P0"] > 0
+    blocking = result.blocking_skips
+    next_steps: list[str] = []
+    if has_p0:
+        next_steps.append("Fix all P0 issues before sending. The list is blocked.")
+    if "L013" in fired_rules:
+        next_steps.append("Deduplicate the list by domain before sending.")
+    if "L009" in fired_rules:
+        next_steps.append("Re-verify enrichment for flagged rows.")
+    if "L008" in fired_rules:
+        next_steps.append("Confirm work emails for rows with personal addresses.")
+    if blocking:
+        next_steps.append(
+            "Add missing columns or configure missing sources to unlock skipped gates."
+        )
+    if not next_steps:
+        next_steps.append("No action needed.")
+
+    next_class = "next-blocked" if has_p0 or blocking else "next-pass"
+
     parts: list[str] = []
     parts.append("""<!DOCTYPE html>
 <html lang="en">
@@ -215,6 +277,11 @@ def render_html(result: Result, strict: bool = False) -> str:
   .verdict.blocked { background: rgba(248,81,73,.15); color: var(--p0); border: 1px solid var(--p0); }
   .verdict.advisory { background: rgba(210,153,34,.15); color: var(--p1); border: 1px solid var(--p1); }
   .verdict.pass { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid var(--green); }
+  .summary { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: .95rem; }
+  .summary.blocked { border-left: 4px solid var(--p0); }
+  .summary.advisory { border-left: 4px solid var(--p1); }
+  .summary.pass { border-left: 4px solid var(--green); }
   .counts { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
   .count { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
   padding: .75rem 1.25rem; text-align: center; min-width: 80px; }
@@ -225,14 +292,22 @@ def render_html(result: Result, strict: bool = False) -> str:
   .count.p2 .n { color: var(--p2); }
   .stats { color: var(--dim); font-size: .85rem; margin-bottom: 1.5rem; }
   .stats span { margin-right: 1rem; }
-  h2 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 .75rem; color: var(--dim);
+  h2 { font-size: 1rem; font-weight: 600; margin: 1.75rem 0 .75rem; color: var(--dim);
   text-transform: uppercase; letter-spacing: .05em; }
-  .skip { background: var(--card); border: 1px solid var(--p0); border-radius: 8px;
+  .skip { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
   padding: .75rem 1rem; margin-bottom: .5rem; }
-  .skip .rule { font-weight: 600; color: var(--p0); }
+  .skip.blocking { border-left: 4px solid var(--p0); }
+  .skip.notchecked { border-left: 4px solid var(--dim); }
+  .skip .rule { font-weight: 600; }
+  .skip.blocking .rule { color: var(--p0); }
+  .skip .reason { color: var(--dim); font-size: .85rem; }
+  .skip .unlock { color: var(--p2); font-size: .8rem; margin-top: .25rem; }
   .finding { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-  padding: 1rem; margin-bottom: .75rem; }
-  .finding .head { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+  padding: 1rem 1.25rem; margin-bottom: .75rem; }
+  .finding.P0 { border-left: 4px solid var(--p0); }
+  .finding.P1 { border-left: 4px solid var(--p1); }
+  .finding.P2 { border-left: 4px solid var(--p2); }
+  .finding .head { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap; }
   .finding .sev { font-weight: 700; font-size: .8rem; padding: .15rem .4rem; border-radius: 4px; }
   .finding .sev.P0 { color: var(--p0); background: rgba(248,81,73,.1); }
   .finding .sev.P1 { color: var(--p1); background: rgba(210,153,34,.1); }
@@ -240,13 +315,20 @@ def render_html(result: Result, strict: bool = False) -> str:
   .finding .rid { font-weight: 600; }
   .finding .title { color: var(--text); }
   .finding .count { color: var(--dim); font-size: .85rem; }
-  .finding .detail { font-size: .9rem; margin-bottom: .5rem; }
-  .finding .ref { color: var(--dim); font-size: .85rem; }
+  .finding .examples { margin: .5rem 0 .5rem; padding-left: .25rem; }
+  .finding .detail { font-size: .9rem; margin-bottom: .35rem; }
+  .finding .ref { color: var(--dim); font-size: .8rem; }
+  .finding .showing { color: var(--dim); font-size: .8rem; font-style: italic; margin: .35rem 0 .5rem; }
   .finding .fix, .finding .why { font-size: .85rem; color: var(--dim); margin-top: .25rem; }
   .finding .fix strong, .finding .why strong { color: var(--text); }
-  .advisory-skip { color: var(--dim); font-size: .85rem; padding: .25rem 0; }
   .note { color: var(--dim); font-size: .85rem; padding: .15rem 0; }
-  .more { color: var(--dim); font-size: .85rem; }
+  .next { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.25rem; margin-top: .5rem; }
+  .next.next-blocked { border-left: 4px solid var(--p0); }
+  .next.next-pass { border-left: 4px solid var(--green); }
+  .next h2 { margin-top: 0; }
+  .next ol { padding-left: 1.25rem; }
+  .next li { margin-bottom: .35rem; font-size: .95rem; }
 </style>
 </head>
 <body>
@@ -255,6 +337,8 @@ def render_html(result: Result, strict: bool = False) -> str:
     parts.append(f"<h1>revgate {esc(result.surface)}</h1>")
     parts.append(f"<div class=\"target\">{esc(result.target)}</div>")
     parts.append(f"<div class=\"verdict {verdict_class}\">{esc(verdict)}</div>")
+
+    parts.append(f'<div class="summary {verdict_class}">{esc(summary)}</div>')
 
     parts.append('<div class="counts">')
     for sev, cls in [("P0", "p0"), ("P1", "p1"), ("P2", "p2")]:
@@ -271,45 +355,60 @@ def render_html(result: Result, strict: bool = False) -> str:
                 parts.append(f'<span>{esc(k)} {esc(v)}</span>')
             parts.append('</div>')
 
-    blocking = result.blocking_skips
     if blocking:
-        parts.append('<h2>Checks that were configured and did not run</h2>')
+        parts.append('<h2>Skipped gates — blocking</h2>')
+        parts.append('<div class="stats" style="margin-bottom:.75rem">These were configured but could not run. A gate that cannot run is not a gate that passed.</div>')
         for s in blocking:
-            parts.append(f'<div class="skip"><span class="rule">{esc(s.rule)}</span> — {esc(s.reason)}</div>')
+            parts.append(f'<div class="skip blocking"><span class="rule">{esc(s.rule)}</span> — <span class="reason">{esc(s.reason)}</span></div>')
 
     grouped = group_findings(result.findings)
     if grouped:
         parts.append('<h2>Findings</h2>')
         for rule_id, title, items in grouped:
             head = items[0]
-            parts.append('<div class="finding">')
+            parts.append(f'<div class="finding {head.severity.value}">')
             parts.append('<div class="head">')
             parts.append(f'<span class="sev {head.severity.value}">{head.severity.value}</span>')
             parts.append(f'<span class="rid">{esc(rule_id)}</span>')
             parts.append(f'<span class="title">{esc(title)}</span>')
-            parts.append(f'<span class="count">({len(items)})</span>')
+            parts.append(f'<span class="count">({pct(len(items))})</span>')
             parts.append('</div>')
-            for f in items[:10]:
+            parts.append('<div class="examples">')
+            for f in items[:3]:
                 ref = _row_ref(f)
                 parts.append(f'<div class="detail">{esc(f.detail)}</div>')
                 if ref:
                     parts.append(f'<div class="ref">{esc(ref)}</div>')
-            if len(items) > 10:
-                parts.append(f'<div class="more">… {len(items) - 10} more</div>')
+            parts.append('</div>')
+            if len(items) > 3:
+                parts.append(f'<div class="showing">showing 3 of {len(items)}</div>')
             parts.append(f'<div class="fix"><strong>Fix:</strong> {esc(head.remedy)}</div>')
             parts.append(f'<div class="why"><strong>Why:</strong> {esc(head.origin)}</div>')
             parts.append('</div>')
 
     advisory = [s for s in result.skipped if not s.blocking]
     if advisory:
-        parts.append('<h2>Not checked</h2>')
+        parts.append('<h2>Skipped gates — not checked</h2>')
+        parts.append('<div class="stats" style="margin-bottom:.75rem">No column in this file matched what the gate needs. Add the column to unlock each gate.</div>')
         for s in advisory:
-            parts.append(f'<div class="advisory-skip">{esc(s.rule)} — {esc(s.reason)}</div>')
+            col = gate_columns.get(s.rule)
+            parts.append(f'<div class="skip notchecked"><span class="rule">{esc(s.rule)}</span> — <span class="reason">{esc(s.reason)}</span>')
+            if col:
+                parts.append(f'<div class="unlock">Add a {esc(col)} column to run this gate.</div>')
+            parts.append('</div>')
 
     if result.notes:
         parts.append('<h2>Notes</h2>')
         for note in result.notes:
             parts.append(f'<div class="note">{esc(note)}</div>')
+
+    parts.append(f'<div class="next {next_class}">')
+    parts.append('<h2>What to do next</h2>')
+    parts.append('<ol>')
+    for step in next_steps:
+        parts.append(f'<li>{esc(step)}</li>')
+    parts.append('</ol>')
+    parts.append('</div>')
 
     parts.append('</body></html>')
     return "\n".join(parts)

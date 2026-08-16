@@ -311,7 +311,7 @@ Read that before deciding what this is worth.
 ```
 revgate/
   core/         findings, severity, CSV loading and normalisation, reporters, config
-  lists/        the thirteen gates and their runner
+  lists/        the seventeen gates and their runner
   agents/       battery loader, target adapters, judges, scenario runner
   batteries/    adversarial scenarios (TOML)
   provenance.py verifies factory-usage.toml, records run history
