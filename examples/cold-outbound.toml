@@ -7,12 +7,13 @@
 # Usage:
 #   revgate lint -c examples/cold-outbound.toml leads.csv
 
+[lint]
 # P0 findings block the pipeline. P1 findings are advisory unless --strict.
 strict = false
 
 # Restricted jurisdictions — states where you cannot cold-call or cold-email
 # without specific registration. Add your own based on your legal review.
-restricted_states = ["NY", "FL", "TN"]
+restricted_states = ["NY"]
 
 # DNC staleness: how many days before a DNC check is considered stale and
 # must be re-verified. 31 days is the industry standard.
@@ -28,18 +29,12 @@ title_exclude_keywords = ["intern", "student", "assistant", "coordinator"]
 
 # Headcount ceiling: if a company's headcount is above this, the lead is
 # flagged as out-of-ICP. Adjust for your motion.
-headcount_ceiling = 5000
+headcount_exclude_above = 5000
 
-# Calling hours: revgate will flag leads scheduled outside these hours.
-# Times are in the lead's local timezone (24-hour format).
-calling_hours_start = 9
-calling_hours_end = 17
-
-# Email limits for first-touch emails.
-email_max_length = 300
-email_max_links = 1
-email_max_ctas = 1
+# Rows contacted inside this window are held, whatever the CRM stage says.
+recent_contact_days = 14
 
 # Suppression sources — files of accounts and phone numbers to exclude.
-# suppress = "data/accounts-in-play.csv"
+# [lint.sources]
+# suppression = "data/accounts-in-play.csv"
 # dnc = "data/dnc-list.csv"

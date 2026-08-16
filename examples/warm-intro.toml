@@ -7,6 +7,7 @@
 # Usage:
 #   revgate lint -c examples/warm-intro.toml leads.csv
 
+[lint]
 strict = false
 
 # No restricted states for warm intros — the prospect has opted in.
@@ -24,12 +25,7 @@ stale_enrichment_days = 180
 title_exclude_keywords = ["intern", "student"]
 
 # Higher headcount ceiling — warm intros can target enterprise.
-headcount_ceiling = 50000
+headcount_exclude_above = 50000
 
-calling_hours_start = 8
-calling_hours_end = 19
-
-# Email can be longer for warm intros — you have more context.
-email_max_length = 500
-email_max_links = 2
-email_max_ctas = 1
+# Warm-intro leads may have been contacted more recently.
+recent_contact_days = 7

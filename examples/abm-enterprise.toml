@@ -7,9 +7,11 @@
 # Usage:
 #   revgate lint -c examples/abm-enterprise.toml leads.csv
 
+[lint]
+# ABM is strict — P1 findings also block.
 strict = true
 
-# ABM is always US-based for this example.
+# ABM is US-based for this example, no state restrictions.
 restricted_states = []
 
 # DNC must be very fresh for enterprise deals.
@@ -25,12 +27,7 @@ title_exclude_keywords = [
 ]
 
 # Tight headcount range — enterprise only.
-headcount_ceiling = 100000
+headcount_exclude_above = 100000
 
-calling_hours_start = 9
-calling_hours_end = 17
-
-# Short, personalized emails for enterprise.
-email_max_length = 200
-email_max_links = 1
-email_max_ctas = 1
+# Enterprise deals have longer cycles; recent contact window is wider.
+recent_contact_days = 30

@@ -486,7 +486,7 @@ revgate provenance · factory-usage.toml
 ```
 
 [`factory-usage.toml`](factory-usage.toml) lists every Factory surface the project
-says it uses. `provenance` validates each claim against the file it names, and then
+says it uses (11 claims). `provenance` validates each claim against the file it names, and then
 walks the repository the other way to flag any Factory surface that exists but is
 undocumented, because a manifest that lags the code stops being evidence.
 
@@ -497,7 +497,7 @@ undocumented, because a manifest that lags the code stops being evidence.
 | **Hooks** | `PostToolUse` lints a lead-list CSV the moment it is written. `PreToolUse` refuses a `git commit` that would stage a blocked list. |
 | **`droid exec`** | `--judge droid` delegates assertions no regex can make to the operator's existing Droid session. No second API key. Every judgement records its `session_id`. |
 | **Multi-agent audit** | `revgate audit --judge droid` splits the audit across multiple `droid exec` sessions — one per finding group, run **in parallel** — with a cross-validation synthesis session that checks the other agents' work. Five phases, five milestones: planning, pattern gates, parallel review, cross-validation, final report. |
-| **CI** | One credential-free job asserting the exit-code contract, one `droid exec` job that runs the reviewer droids on changed gates. |
+| **CI** | Four jobs: `gate` (credential-free exit-code contract), `droid-review` (reviewer droids on changed gates), `docker-smoke` (container builds and serves), `droid-audit` (parallel multi-agent audit on push to main). |
 
 **Droid as runtime, not dependency.** The semantic judge shells out to
 `droid exec --output-format json` in the session you are already authenticated for:

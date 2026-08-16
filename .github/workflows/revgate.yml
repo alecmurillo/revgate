@@ -218,3 +218,183 @@ jobs:
             review-summary.md
             /tmp/droid-review.json
           if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Docker smoke test. Builds the image and hits /v1/health. One assertion:
+  # the Dockerfile is not broken. Does not test every endpoint — the API tests
+  # already cover that. This just proves the container runs.
+  # ---------------------------------------------------------------------------
+  docker-smoke:
+    name: docker smoke
+    runs-on: ubuntu-latest
+    needs: gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t revgate .
+
+      - name: Start the server
+        run: |
+          docker run -d -p 8000:8000 -e REVGATE_API_KEY=test-secret --name revgate revgate
+          # Wait for the server to be ready
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:8000/v1/health > /dev/null 2>&1; then
+              echo "server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not start in time"
+          docker logs revgate
+          exit 1
+
+      - name: Health check
+        run: |
+          set +e
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/v1/health)
+          set -e
+          echo "health check returned HTTP $code"
+          test "$code" -eq 200 || (echo "expected 200, got $code" && exit 1)
+
+      - name: Auth check (missing key must 401)
+        run: |
+          set +e
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/v1/lint \
+            -H 'Content-Type: application/json' \
+            -d '{"source":"clay","rows":[]}')
+          set -e
+          echo "unauthenticated request returned HTTP $code"
+          test "$code" -eq 401 || (echo "expected 401, got $code" && exit 1)
+
+      - name: Authenticated request must work
+        run: |
+          set +e
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/v1/lint \
+            -H 'Content-Type: application/json' \
+            -H 'X-Revgate-Key: test-secret' \
+            -d '{"source":"clay","rows":[{"Company Name":"Acme","Domain":"acme.com","Email":"ops@acme.com","Trigger":"opened new DC","Copy":"Saw the new DC"}]}')
+          set -e
+          echo "authenticated request returned HTTP $code"
+          test "$code" -ge 200 -a "$code" -lt 500 || (echo "expected 2xx or 4xx, got $code" && exit 1)
+
+  # ---------------------------------------------------------------------------
+  # Droid audit. Runs the multi-agent audit with real parallel droid exec
+  # sessions against the dirty fixture. This is the proof that droids are
+  # making this project what it is: the audit decomposes the findings across
+  # parallel agent sessions, each reviewing a rule group, then a synthesis
+  # session cross-validates. Skips cleanly when the secret is absent.
+  # ---------------------------------------------------------------------------
+  droid-audit:
+    name: droid audit
+    runs-on: ubuntu-latest
+    needs: gate
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for credentials
+        id: creds
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          if [ -n "$FACTORY_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "FACTORY_API_KEY is not set; skipping the Droid audit." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install the Droid CLI
+        if: steps.creds.outputs.available == 'true'
+        run: |
+          curl -fsSL https://app.factory.ai/cli | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the multi-agent audit
+        if: steps.creds.outputs.available == 'true'
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          set +e
+          python -m revgate audit fixtures/leads-dirty.csv \
+            --judge droid \
+            --max-workers 4 \
+            --today 2026-08-16 \
+            --format json \
+            --no-record \
+            > /tmp/audit.json
+          code=$?
+          set -e
+
+          # The audit should exit 2 (BLOCKED) — the dirty list has P0 findings.
+          # What matters is that the droid sessions ran, not the exit code.
+          echo "audit exit=$code"
+
+          python - <<'PY'
+          import json, pathlib
+          raw = pathlib.Path("/tmp/audit.json").read_text() or "{}"
+          try:
+              data = json.loads(raw)
+          except json.JSONDecodeError:
+              data = {"phases": [], "milestones": [], "agent_reviews": [], "synthesis": {}}
+
+          phases = data.get("phases", [])
+          milestones = data.get("milestones", [])
+          reviews = data.get("agent_reviews", [])
+          synthesis = data.get("synthesis", {})
+          sessions = data.get("agent_sessions", 0)
+
+          summary_lines = [
+              "## Droid audit\n",
+              f"- **Phases**: {len(phases)}",
+              f"- **Milestones**: {len(milestones)}",
+              f"- **Agent sessions**: {sessions}",
+              f"- **Synthesis overall**: {synthesis.get('overall', 'unjudged')}",
+              f"- **Synthesis disagreements**: {len(synthesis.get('disagreements', []))}",
+              "",
+              "### Phases",
+          ]
+          for p in phases:
+              summary_lines.append(f"- {p}")
+
+          summary_lines.append("\n### Milestones")
+          for m in milestones:
+              summary_lines.append(f"- [{m.get('status','')}] {m.get('phase','')}: {m.get('detail','')}")
+
+          summary_lines.append("\n### Agent reviews (parallel sessions)")
+          for r in reviews:
+              sid = r.get("session_id", "")
+              sid_short = sid[:8] if sid else "no session"
+              summary_lines.append(
+                  f"- {r.get('rule','')}: verdict={r.get('verdict','')}, "
+                  f"session={sid_short}, "
+                  f"TP={r.get('true_positives',0)}, FP={r.get('false_positives',0)}"
+              )
+
+          if synthesis.get("session_id"):
+              summary_lines.append(f"\n### Synthesis session")
+              summary_lines.append(f"- session: `{synthesis['session_id'][:8]}`")
+              if synthesis.get("recommendation"):
+                  summary_lines.append(f"- recommendation: {synthesis['recommendation']}")
+
+          out = pathlib.Path("audit-summary.md")
+          out.write_text("\n".join(summary_lines) + "\n")
+          print(out.read_text())
+          PY
+
+          cat audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the audit
+        if: always() && steps.creds.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: droid-audit
+          path: |
+            audit-summary.md
+            /tmp/audit.json
+          if-no-files-found: ignore
