@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revgate"
+version = "0.1.0"
+description = "Fail-closed QA for revenue machinery: gates outbound lead lists and red-teams customer-facing sales agents."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Alec Murillo" }]
+keywords = ["outbound", "sales", "lead-lists", "data-quality", "red-teaming", "llm-evaluation", "gtm"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Office/Business",
+]
+
+# Intentionally empty, and treated as a constraint rather than an accident.
+# The gate has to run in a CI container, on an analyst's laptop, and inside a
+# pre-commit hook with no virtualenv. `tomllib` is stdlib from 3.11, which is
+# the only reason that floor exists.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/alecmurillo/revgate"
+Source = "https://github.com/alecmurillo/revgate"
+Issues = "https://github.com/alecmurillo/revgate/issues"
+
+[project.scripts]
+revgate = "revgate.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["revgate*"]
+
+[tool.setuptools.package-data]
+revgate = ["batteries/*.toml"]

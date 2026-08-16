@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# revgate run history and transcripts are local evidence, not source.
+# `provenance --runs` reads them; they are per-machine and not shared.
+.revgate/
+transcripts/
+review-summary.md
+
+# Real lead lists must never end up in a public repository. The only CSVs that
+# belong here are the synthetic ones under fixtures/.
+*.csv
+!fixtures/*.csv
+
+# Editors, OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

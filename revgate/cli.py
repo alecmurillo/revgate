@@ -1,0 +1,318 @@
+"""Command line entry point.
+
+Exit codes are the contract, because the point of the tool is to stop something:
+
+    0  clean
+    1  advisory findings only, and --strict was passed
+    2  blocked: a P0 finding, or a configured check that could not run
+    3  usage or configuration error
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from . import __version__, provenance as provenance_mod
+from .core.config import Config
+from .core.findings import EXIT_USAGE, Result, Severity
+from .core.report import render
+
+DEFAULT_BATTERY = Path(__file__).resolve().parent / "batteries" / "sales-intake.toml"
+
+
+def _emit(text: str, out: str | None) -> None:
+    if out:
+        path = Path(out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+        print(f"wrote {path}")
+    else:
+        print(text)
+
+
+def _finish(result: Result, cfg: Config, args: argparse.Namespace) -> int:
+    _emit(render(result, args.format, cfg.strict), getattr(args, "out", None))
+    if not getattr(args, "no_record", False):
+        provenance_mod.record_run(cfg, result)
+    return result.exit_code(cfg.strict)
+
+
+def _base_config(args: argparse.Namespace) -> Config:
+    cfg = Config.load(getattr(args, "config", None))
+    overrides: dict[str, object] = {}
+    if getattr(args, "strict", False):
+        overrides["strict"] = True
+    if getattr(args, "suppress", None):
+        overrides["suppression"] = Path(args.suppress).resolve()
+    if getattr(args, "dnc", None):
+        overrides["dnc"] = Path(args.dnc).resolve()
+    if getattr(args, "today", None):
+        try:
+            overrides["today"] = datetime.strptime(args.today, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise SystemExit(f"revgate: --today must be YYYY-MM-DD ({exc})")
+    if getattr(args, "target", None):
+        overrides["target"] = args.target
+    if getattr(args, "judge", None):
+        overrides["judge"] = args.judge
+    if getattr(args, "judge_model", None):
+        overrides["judge_model"] = args.judge_model
+    if getattr(args, "battery", None):
+        overrides["battery"] = Path(args.battery).resolve()
+    return cfg.with_overrides(**overrides)
+
+
+# --------------------------------------------------------------------------
+# commands
+# --------------------------------------------------------------------------
+
+def cmd_lint(args: argparse.Namespace) -> int:
+    from .lists import runner
+
+    cfg = _base_config(args)
+    only = [t for t in (args.only or "").split(",") if t.strip()] or None
+    try:
+        result = runner.run(args.leads, cfg, only=only)
+    except FileNotFoundError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except ValueError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return _finish(result, cfg, args)
+
+
+def cmd_redteam(args: argparse.Namespace) -> int:
+    from .agents import judge as judge_mod, runner
+    from .agents.battery import Battery
+    from .agents.targets import build as build_target
+    from .agents.targets.openai_compat import TargetError
+
+    cfg = _base_config(args)
+    battery_path = Path(cfg.battery) if cfg.battery else DEFAULT_BATTERY
+    if not battery_path.is_file():
+        print(f"revgate: no battery at {battery_path}; pass --battery", file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        battery = Battery.load(battery_path)
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        target = build_target(cfg.target, system=battery.system)
+    except (ValueError, TargetError) as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        judge = judge_mod.build(cfg.judge, model=cfg.judge_model, cwd=cfg.root)
+    except ValueError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    only = [t for t in (args.only or "").split(",") if t.strip()] or None
+    try:
+        result = runner.run(
+            battery, cfg, target=target, judge=judge,
+            only=only, priority=args.priority, transcripts_dir=args.transcripts,
+        )
+    except ValueError as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return _finish(result, cfg, args)
+
+
+def cmd_provenance(args: argparse.Namespace) -> int:
+    cfg = _base_config(args)
+
+    if args.runs:
+        summary = provenance_mod.summarize_runs(cfg)
+        if args.format == "json":
+            import json
+
+            _emit(json.dumps(summary, indent=2), args.out)
+            return 0
+        lines = [
+            "",
+            f"revgate run history · {summary['runs']} run(s)",
+        ]
+        for surface, count in sorted(summary["by_surface"].items()):
+            lines.append(f"  {surface:<12} {count}")
+        lines.append(f"  assertions judged by droid exec: {summary['droid_judged_assertions']}")
+        lines.append(f"  distinct droid sessions:         {len(summary['droid_sessions'])}")
+        for sid in summary["droid_sessions"][:10]:
+            lines.append(f"    {sid}")
+        if len(summary["droid_sessions"]) > 10:
+            lines.append(f"    … {len(summary['droid_sessions']) - 10} more")
+        if summary["first"]:
+            lines.append(f"  first {summary['first']}")
+            lines.append(f"  last  {summary['last']}")
+        lines.append("")
+        _emit("\n".join(lines), args.out)
+        return 0
+
+    result = provenance_mod.verify(cfg)
+    return _finish(result, cfg, args)
+
+
+def cmd_rules(args: argparse.Namespace) -> int:
+    from .lists.rules import RULES
+
+    if args.format == "json":
+        import json
+
+        payload = [
+            {
+                "id": r.id, "name": r.name, "severity": r.severity.value,
+                "summary": r.summary, "origin": r.origin,
+            }
+            for r in RULES
+        ]
+        _emit(json.dumps(payload, indent=2), args.out)
+        return 0
+
+    if args.format == "md":
+        lines = ["| Gate | Severity | Checks for | Why it exists |", "|---|---|---|---|"]
+        for r in RULES:
+            lines.append(f"| `{r.id}` {r.name} | {r.severity.value} | {r.summary} | {r.origin} |")
+        _emit("\n".join(lines), args.out)
+        return 0
+
+    lines = ["", f"revgate list gates ({len(RULES)})", ""]
+    for r in RULES:
+        lines.append(f"  {r.severity.value}  {r.id}  {r.name}")
+        lines.append(f"        {r.summary}")
+        lines.append(f"        why: {r.origin}")
+        lines.append("")
+    _emit("\n".join(lines), args.out)
+    return 0
+
+
+def cmd_scenarios(args: argparse.Namespace) -> int:
+    from .agents.battery import Battery
+
+    cfg = _base_config(args)
+    battery_path = Path(cfg.battery) if cfg.battery else DEFAULT_BATTERY
+    try:
+        battery = Battery.load(battery_path)
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    if args.format == "json":
+        import json
+
+        payload = [
+            {
+                "id": s.id, "title": s.title, "priority": s.priority.value,
+                "tags": list(s.tags), "turns": list(s.turns),
+                "assertions": {
+                    "must_not_match": [p.pattern for p in s.must_not_match],
+                    "must_match_any": [p.pattern for p in s.must_match_any],
+                    "must_match_all": [p.pattern for p in s.must_match_all],
+                    "semantic": s.semantic,
+                },
+            }
+            for s in battery.scenarios
+        ]
+        _emit(json.dumps(payload, indent=2), args.out)
+        return 0
+
+    if args.format == "md":
+        lines = [f"# {battery.name}", "", battery.description, "",
+                 "| ID | Priority | Scenario | Tags |", "|---|---|---|---|"]
+        for s in battery.scenarios:
+            lines.append(f"| `{s.id}` | {s.priority.value} | {s.title} | {', '.join(s.tags)} |")
+        _emit("\n".join(lines), args.out)
+        return 0
+
+    lines = ["", f"{battery.name} · {len(battery.scenarios)} scenarios", ""]
+    for s in battery.scenarios:
+        tags = f"  [{', '.join(s.tags)}]" if s.tags else ""
+        lines.append(f"  {s.priority.value}  {s.id:<8} {s.title}{tags}")
+    lines.append("")
+    _emit("\n".join(lines), args.out)
+    return 0
+
+
+# --------------------------------------------------------------------------
+# parser
+# --------------------------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="revgate",
+        description="Fail-closed QA for the artifacts that touch your prospects.",
+    )
+    parser.add_argument("--version", action="version", version=f"revgate {__version__}")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    def common(p: argparse.ArgumentParser) -> None:
+        p.add_argument("-c", "--config", help=f"path to a config file (default: nearest revgate.toml)")
+        p.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+        p.add_argument("-o", "--out", help="write the report here instead of stdout")
+        p.add_argument("--strict", action="store_true", help="exit 1 on P1 findings as well as P0")
+        p.add_argument("--no-record", action="store_true", help="do not append a run record under .revgate/runs")
+
+    lint = sub.add_parser("lint", help="gate a lead list before it is dialled or sent")
+    lint.add_argument("leads", help="CSV of leads to check")
+    lint.add_argument("--suppress", help="CSV of accounts already in play (CRM export, prior campaign)")
+    lint.add_argument("--dnc", help="CSV of suppressed phone numbers")
+    lint.add_argument("--only", help="run only these gates, e.g. L001,L003")
+    lint.add_argument("--today", help="pin the reference date (YYYY-MM-DD) for reproducible runs")
+    common(lint)
+    lint.set_defaults(func=cmd_lint)
+
+    red = sub.add_parser("redteam", help="run adversarial scenarios against a customer-facing agent")
+    red.add_argument("--battery", help="battery TOML (default: the bundled sales-intake battery)")
+    red.add_argument("--target", choices=("demo", "openai", "shell"), help="what to test (default: demo)")
+    red.add_argument("--judge", choices=("pattern", "droid"), help="how to grade (default: pattern)")
+    red.add_argument("--judge-model", help="model id for the droid judge")
+    red.add_argument("--only", help="run only these scenario ids")
+    red.add_argument("--priority", choices=("P0", "P1", "P2"), help="run this priority and above")
+    red.add_argument("--transcripts", help="write every exchange to this directory")
+    common(red)
+    red.set_defaults(func=cmd_redteam)
+
+    prov = sub.add_parser("provenance", help="verify how this repo uses Factory, or show run history")
+    prov.add_argument("--runs", action="store_true", help="summarise recorded runs instead of verifying claims")
+    common(prov)
+    prov.set_defaults(func=cmd_provenance)
+
+    rules = sub.add_parser("rules", help="list the list gates and why each exists")
+    rules.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+    rules.add_argument("-o", "--out")
+    rules.set_defaults(func=cmd_rules)
+
+    scen = sub.add_parser("scenarios", help="list the scenarios in a battery")
+    scen.add_argument("--battery")
+    scen.add_argument("-c", "--config")
+    scen.add_argument("-f", "--format", choices=("text", "md", "json"), default="text")
+    scen.add_argument("-o", "--out")
+    scen.set_defaults(func=cmd_scenarios)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.func(args))
+    except KeyboardInterrupt:
+        print("\nrevgate: interrupted", file=sys.stderr)
+        return EXIT_USAGE
+    except SystemExit as exc:
+        if isinstance(exc.code, str):
+            print(exc.code, file=sys.stderr)
+            return EXIT_USAGE
+        return int(exc.code or 0)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

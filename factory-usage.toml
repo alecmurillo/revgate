@@ -1,0 +1,246 @@
+# factory-usage.toml
+#
+# Every claim this repository makes about how it uses Factory, in a form a machine
+# can check. `revgate provenance` validates each entry against the file it names and
+# fails if a claim does not hold. It also walks the repository in the other
+# direction and flags any Factory surface that exists here but is not listed below,
+# because a manifest that lags the code stops being evidence.
+#
+# The `novel` field is the honest one. Most entries say "standard": they are
+# documented Factory features used the documented way, and there is nothing clever
+# about them. Two entries say "unusual", and NOVELTY.md argues for why, with the
+# prior art named. If you are auditing this project, those two are the ones to
+# attack.
+
+[project]
+name = "revgate"
+summary = "Fail-closed QA for revenue machinery: outbound lead lists and customer-facing sales agents."
+factory_surfaces = ["skills", "custom droids", "hooks", "droid exec", "CI"]
+
+# ---------------------------------------------------------------------------
+# Skills: the review workflows, so the judgement lives in the repo
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX01"
+surface = "skill"
+path = ".factory/skills/revgate-list-review/SKILL.md"
+check = "skill"
+expect = ["python3 -m revgate lint", "origin"]
+does = """
+Runs the list gate, then does the part the gate cannot: sorting findings into
+row-level defects, pipeline defects and motion defects, and insisting the skip list
+is read before the findings.
+"""
+novel = """
+Standard. A skill holding a review workflow is the documented use of the feature.
+The only thing worth noting is what the workflow refuses to do: it will not call a
+list clean without re-running the gate and quoting the exit code it observed.
+"""
+
+[[surface]]
+id = "FX02"
+surface = "skill"
+path = ".factory/skills/revgate-agent-redteam/SKILL.md"
+check = "skill"
+expect = ["--judge droid", "expected-pass"]
+does = """
+Runs the adversarial battery, requires the offline demo target first as a harness
+self-test, and groups failures by mechanism (stateless checks that are not
+stateless, claims generated rather than retrieved) rather than by output.
+"""
+novel = """
+Standard as a skill. The instruction that earns its place is the demand for a
+control group: a battery where everything fails cannot distinguish a broken
+guardrail from a broken matcher, so the skill treats an all-fail run as evidence
+the harness is wrong.
+"""
+
+# ---------------------------------------------------------------------------
+# Custom droids: reviewers with the project's standards in their prompt
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX03"
+surface = "droid"
+path = ".factory/droids/list-gate-reviewer.md"
+check = "droid"
+expect = ["fails closed", "leads-clean.csv"]
+does = """
+Reviews new or modified list gates read-only. Its first question is whether the
+gate can return a pass for a row it never evaluated, and it blocks approval on any
+gate with no dirty-fixture row exercising it.
+"""
+novel = """
+Standard mechanism, specific content. A read-only reviewer droid is documented
+Factory usage; what is unusual is that the checklist is derived from this
+codebase's one invariant rather than from generic code-review advice.
+"""
+
+[[surface]]
+id = "FX04"
+surface = "droid"
+path = ".factory/droids/scenario-author.md"
+check = "droid"
+expect = ["expected-pass", "must_not_match"]
+does = """
+Writes adversarial scenarios and validates them by running them against the
+bundled deliberately-unsafe demo agent, confirming the new adversarial scenario
+fails and the new control passes before reporting.
+"""
+novel = """
+Standard mechanism. The self-validation loop is the interesting part: the droid is
+required to prove its own assertions match something, using an agent known to be
+unsafe as the oracle.
+"""
+
+[[surface]]
+id = "FX05"
+surface = "droid"
+path = ".factory/droids/origin-auditor.md"
+check = "droid"
+expect = ["revgate provenance", "NOVELTY.md"]
+does = """
+Audits drift between what the repository claims and what it does: generic origin
+fields, origins that no longer match their implementation, documentation quoting
+stale numbers, and novelty claims weaker than NOVELTY.md implies.
+"""
+novel = """
+Unusual. This droid's assignment is to attack the project's own claims, including
+the novelty argument in NOVELTY.md and the entries in this file. It exists because
+`revgate provenance` can prove a skill file parses but cannot prove the skill is
+honest, and that gap needed an owner.
+"""
+
+# ---------------------------------------------------------------------------
+# Hooks: the gate enforced inside the agent session
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX06"
+surface = "hooks"
+path = ".factory/hooks.json"
+check = "hooks"
+expect = ["PreToolUse", "PostToolUse", ".factory/hooks/lead_list_gate.py"]
+does = """
+Registers one script on two events: PostToolUse on Create/Edit/ApplyPatch to lint a
+lead list the moment it is written, and PreToolUse on Execute to refuse a
+`git commit` that would stage a blocked list.
+"""
+novel = """
+Standard registration. The two events are chosen for a reason: PostToolUse catches
+the file while the agent still has the context to fix the code that produced it,
+and PreToolUse is the last point at which the mistake is still free.
+"""
+
+[[surface]]
+id = "FX07"
+surface = "code"
+path = ".factory/hooks/lead_list_gate.py"
+check = "code"
+expect = ["hook_event_name", "BLOCKED_EXIT = 2", "REVGATE_HOOK_FAIL_OPEN"]
+does = """
+The hook implementation. Exits 2 to block, 0 to allow, 1 when the hook itself
+breaks. Blocks on P0 findings and also on a list it could not evaluate, because an
+unevaluated list is not a clean one.
+"""
+novel = """
+Unusual. The hook fails closed on lint results and open on its own bugs, and the
+asymmetry is deliberate: a gate that wedges every commit in the repository gets
+deleted within the hour, and a deleted gate catches nothing. The escape hatch is
+one environment variable and it is documented rather than hidden.
+"""
+
+# ---------------------------------------------------------------------------
+# droid exec: Droid as a runtime the tool calls, not a dependency it ships
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX08"
+surface = "droid exec"
+path = "revgate/agents/judge.py"
+check = "code"
+expect = [
+  "droid exec",
+  "--output-format",
+  "--log-group-id",
+  "session_id",
+  "blocking=True",
+]
+does = """
+The semantic judge. Assertions that no regex can make ("did the agent imply a
+guarantee without using the word") are delegated to `droid exec --output-format
+json`. The verdict envelope's session_id, duration_ms and num_turns are recorded
+with every judgement.
+"""
+novel = """
+Unusual, and the main claim this project makes. Two properties, both load-bearing:
+
+1. No second credential. The harness shells out to the operator's already
+   authenticated Droid session instead of shipping a vendor SDK and asking for an
+   API key of its own. Comparable evaluation tools require their own provider key
+   before they will grade anything.
+
+2. Unjudged is never a pass. If the judge is missing, times out, or answers
+   unparseably, the assertion is recorded as unjudged and blocks, rather than being
+   silently downgraded. Failing open on an unavailable judge is the flaw that makes
+   an evaluation suite worse than no suite at all, because it reports green.
+
+Prior art is named in NOVELTY.md. Model-graded assertions are not new; borrowing
+the operator's agent session as the grader, and treating an ungraded assertion as
+a blocking result, is the part we have not found elsewhere.
+"""
+
+[[surface]]
+id = "FX09"
+surface = "workflow"
+path = ".github/workflows/revgate.yml"
+check = "workflow"
+expect = [
+  "droid exec",
+  "--log-group-id revgate",
+  "python -m revgate provenance",
+  "battery discriminates correctly",
+]
+does = """
+Two jobs. `gate` runs with no credentials and asserts the documented exit codes
+(2 for the dirty list, 0 for the clean one, 2 for the demo agent), then checks the
+battery still discriminates and that this manifest still verifies. `droid-review`
+runs `droid exec` on pull requests that touch gates, batteries or the manifest,
+delegating to the reviewer droids above, and skips cleanly when the secret is
+absent so forks are not broken.
+"""
+novel = """
+Standard for the droid exec half. The unusual half is `gate` asserting exit codes
+as a contract test: every downstream CI integration depends on 0/1/2/3 meaning what
+the README says, so the codes are tested rather than documented and hoped for.
+"""
+
+# ---------------------------------------------------------------------------
+# The verifier itself
+# ---------------------------------------------------------------------------
+
+[[surface]]
+id = "FX10"
+surface = "code"
+path = "revgate/provenance.py"
+check = "code"
+expect = [
+  "factory-usage.toml",
+  "_discover_surfaces",
+  "HOOK_EVENTS",
+  "FORBIDDEN_TOOLS",
+]
+does = """
+Verifies this file. Parses skill and droid frontmatter with no dependencies, checks
+hook events against the real lifecycle event names, rejects illegal custom-droid
+tool policies, confirms expected markers exist in code and workflows, and flags any
+Factory surface present in the repository but absent from this manifest. Also keeps
+run history under .revgate/runs/, including the session ids of droid-backed
+judgements.
+"""
+novel = """
+Unusual. A README can claim any integration; this turns the claims into a build
+step that fails. The reverse check is the part that matters: it is what stops this
+manifest from quietly becoming fiction as the repository changes.
+"""

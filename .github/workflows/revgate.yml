@@ -1,0 +1,220 @@
+name: revgate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The gate runs with no credentials, no network and no secrets. If this job
+  # needs anything, the quickstart in the README is a lie.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: gate (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: No dependencies to install
+        run: |
+          python -c "import sys, tomllib; print(sys.version)"
+          test ! -f requirements.txt || (echo "revgate must stay dependency-free" && exit 1)
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      # The exit codes are the contract every CI integration depends on, so they
+      # are asserted here rather than described in prose. 2 = blocked, 0 = clean.
+      - name: Exit-code contract — dirty list must block
+        run: |
+          set +e
+          python -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16 --no-record
+          code=$?
+          set -e
+          echo "exit=$code"
+          test "$code" -eq 2 || (echo "expected exit 2 (BLOCKED), got $code" && exit 1)
+
+      - name: Exit-code contract — clean list must pass
+        run: |
+          set +e
+          python -m revgate lint fixtures/leads-clean.csv --today 2026-08-16 --no-record
+          code=$?
+          set -e
+          echo "exit=$code"
+          test "$code" -eq 0 || (echo "expected exit 0 (PASS), got $code" && exit 1)
+
+      - name: Exit-code contract — the demo agent must be caught
+        run: |
+          set +e
+          python -m revgate redteam --target demo --no-record --transcripts ./transcripts
+          code=$?
+          set -e
+          echo "exit=$code"
+          test "$code" -eq 2 || (echo "expected exit 2 (BLOCKED), got $code" && exit 1)
+
+      # A battery where everything fails cannot tell a broken guardrail from a
+      # broken matcher. The expected-pass controls are what make the run mean
+      # something, so CI asserts they still pass.
+      - name: The battery must still discriminate
+        run: |
+          python - <<'PY'
+          import json, sys
+          data = json.load(open("transcripts/index.json"))
+          verdicts = {e["scenario"]: e["verdict"] for e in data["exchanges"]}
+          controls = [e["scenario"] for e in data["exchanges"] if "expected-pass" in e.get("tags", [])]
+          adversarial = [s for s in verdicts if s not in controls]
+          bad_controls = [s for s in controls if verdicts[s] != "PASS"]
+          missed = [s for s in adversarial if verdicts[s] != "FAIL"]
+          print(f"{len(controls)} controls, {len(adversarial)} adversarial")
+          if bad_controls:
+              sys.exit(f"controls that should pass did not: {bad_controls}")
+          if missed:
+              sys.exit(f"adversarial scenarios the deliberately-unsafe demo agent survived: {missed}")
+          print("battery discriminates correctly")
+          PY
+
+      # Verify the repository's own claims about how it uses Factory. --strict is
+      # deliberate: an undocumented Factory surface is advisory when a human runs
+      # this, and a build failure here, because drift is exactly what the manifest
+      # exists to catch.
+      - name: Provenance — every documented Factory surface must hold
+        run: |
+          set +e
+          python -m revgate provenance --strict --no-record
+          code=$?
+          set -e
+          echo "exit=$code"
+          test "$code" -eq 0 || (echo "provenance failed: a documented Factory surface is broken, or an undocumented one appeared" && exit 1)
+
+  # ---------------------------------------------------------------------------
+  # Droid review. Runs the repo's own reviewer droids through `droid exec` on the
+  # surfaces most expensive to get wrong: the gates and the batteries. Skips
+  # cleanly when the secret is absent, so forks are not broken by it.
+  # ---------------------------------------------------------------------------
+  droid-review:
+    name: droid review
+    runs-on: ubuntu-latest
+    needs: gate
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for credentials
+        id: creds
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          if [ -n "$FACTORY_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "FACTORY_API_KEY is not set; skipping the Droid review." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Which files changed
+        if: steps.creds.outputs.available == 'true'
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          git diff --name-only "$base" "$head" > /tmp/changed.txt
+          cat /tmp/changed.txt
+          if grep -qE '^(revgate/lists/rules\.py|revgate/batteries/.*\.toml|factory-usage\.toml|\.factory/)' /tmp/changed.txt; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the Droid CLI
+        if: steps.creds.outputs.available == 'true' && steps.changed.outputs.relevant == 'true'
+        run: |
+          curl -fsSL https://app.factory.ai/cli | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Review the changed gates and scenarios
+        if: steps.creds.outputs.available == 'true' && steps.changed.outputs.relevant == 'true'
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          cat > /tmp/review-prompt.md <<'PROMPT'
+          This pull request changes revgate's list gates, its adversarial batteries, or
+          its Factory manifest. Review only the changed files listed in /tmp/changed.txt.
+
+          Delegate to the repository's own reviewer droids and follow their checklists:
+
+          - `.factory/droids/list-gate-reviewer.md` for changes to revgate/lists/rules.py
+          - `.factory/droids/scenario-author.md` for changes to revgate/batteries/*.toml
+          - `.factory/droids/origin-auditor.md` for changes to factory-usage.toml,
+            NOVELTY.md, or anything under .factory/
+
+          The single most important question for any changed gate or scenario: can it
+          report a pass for something it did not actually evaluate? An early return with
+          no findings and no recorded skip is a bug in this codebase, not a shortcut.
+
+          Do not edit anything. Write your review to /tmp/review.md as markdown, with
+          blocking issues first, then non-blocking observations, then the commands you
+          ran and the exit codes you observed.
+          PROMPT
+
+          set +e
+          droid exec \
+            -f /tmp/review-prompt.md \
+            --output-format json \
+            --auto low \
+            --tag revgate-ci-review \
+            --log-group-id revgate \
+            > /tmp/droid-review.json
+          code=$?
+          set -e
+
+          python - <<'PY'
+          import json, pathlib
+          raw = pathlib.Path("/tmp/droid-review.json").read_text() or "{}"
+          try:
+              envelope = json.loads(raw)
+          except json.JSONDecodeError:
+              envelope = {"result": raw}
+          summary = pathlib.Path("/tmp/review.md")
+          body = summary.read_text() if summary.exists() else str(envelope.get("result", ""))
+          out = pathlib.Path("review-summary.md")
+          out.write_text(
+              "## Droid review\n\n"
+              f"- session: `{envelope.get('session_id', 'unknown')}`\n"
+              f"- turns: {envelope.get('num_turns', 'unknown')}\n"
+              f"- duration: {envelope.get('duration_ms', 'unknown')} ms\n\n"
+              + body + "\n"
+          )
+          print(out.read_text())
+          PY
+
+          cat review-summary.md >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+
+      - name: Keep the review
+        if: always() && steps.creds.outputs.available == 'true' && steps.changed.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: droid-review
+          path: |
+            review-summary.md
+            /tmp/droid-review.json
+          if-no-files-found: ignore
