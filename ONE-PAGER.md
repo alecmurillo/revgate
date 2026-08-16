@@ -14,9 +14,17 @@ A lead list is code that runs once, against real people, and cannot be rolled ba
 
 Checks a CSV before it reaches a dialer or sending tool: suppression collisions, do-not-call numbers, restricted jurisdictions, unrendered merge fields, stale enrichment, duplicate phones across accounts, missing recipient names, wrong-seniority titles, and more. Each gate carries the specific mistake it prevents, printed in the report.
 
-### `revgate redteam` — 26 adversarial scenarios against a sales agent
+### `revgate redteam` — 27 adversarial scenarios against a sales agent
 
-Probes commercial failure modes (not content-policy ones): fabricated discounts, false signature confirmations, competitor defamation, invented refund terms, escalation promises, integration fabrication, data security claims, prompt injection, opt-out violations. 20 adversarial scenarios designed to fail, 6 controls designed to pass — because a battery where everything fails can't tell a broken guardrail from a broken matcher.
+Probes commercial failure modes (not content-policy ones): fabricated discounts, false signature confirmations, competitor defamation, invented refund terms, escalation promises, integration fabrication, data security claims, prompt injection, opt-out violations, customer data exfiltration. 21 adversarial scenarios designed to fail, 6 controls designed to pass — because a battery where everything fails can't tell a broken guardrail from a broken matcher.
+
+### `revgate audit` — multi-agent audit with parallel droid exec sessions
+
+Five-phase workflow: planning, pattern gates, parallel agent review (one `droid exec` per finding group, run concurrently), cross-validation synthesis (a final session checks the other agents' work), final report. Each phase is a milestone. Fail-closed if droid is unavailable.
+
+### `revgate serve` — HTTP API with Clay/HubSpot/Apollo adapters
+
+POST `/v1/lint` with Clay, HubSpot, Apollo, or generic payloads. Shared-secret auth. Per-row writeback fields. Optional writeback to Clay/HubSpot APIs via stdlib urllib.
 
 ### `revgate diff` — compare two exports and re-gate what changed
 
@@ -36,6 +44,7 @@ Machine-checks every claim about how the repo uses Factory against the actual fi
 - **3 custom droids**: list-gate-reviewer (read-only), scenario-author (edit/create), origin-auditor (read-only, attacks the repo's own claims)
 - **Hooks**: PostToolUse lints lead lists on write, PreToolUse blocks commits staging bad lists
 - **`droid exec`**: the semantic judge borrows the operator's existing authenticated session — no second API key, no vendor SDK
+- **Multi-agent audit**: `revgate audit --judge droid` splits the audit across parallel `droid exec` sessions — one per finding group — with a cross-validation synthesis session that checks the other agents' work
 - **CI**: one job asserts exit codes, one `droid exec` job runs reviewer droids on changed gates
 
 All 10 claims in `factory-usage.toml` are machine-verified by `revgate provenance`.
@@ -56,11 +65,16 @@ All 10 claims in `factory-usage.toml` are machine-verified by `revgate provenanc
 
 - Zero dependencies, zero credentials for the default path
 - Python 3.11+, stdlib only
-- 208 tests, no network
+- 235 tests, no network
 - Exit codes: 0 clean, 1 advisory+strict, 2 blocked, 3 usage error
 - Bundled demo agent runs offline and deterministic
+- Shell target for testing any agent that speaks JSON on stdin/stdout
+- HTTP API server with Clay/HubSpot/Apollo adapters, shared-secret auth
+- Optional writeback adapters (Clay, HubSpot) via stdlib urllib
+- Dockerfile included for containerized deployment
+- Example configs for cold outbound, warm intro, and ABM motions
 - Output: text, JSON, Markdown (for PR comments), HTML (for sharing)
 
 ## Current state
 
-2 commits on `main`. Local only, no remote. 208 tests pass. Demo asserts all exit codes. Provenance 10/10 verified. Never run against a real agent or a real lead list.
+Pushed to github.com/alecmurillo/revgate. 235 tests pass. Demo asserts all exit codes. Provenance 10/10 verified. CI green.

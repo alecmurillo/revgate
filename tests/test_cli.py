@@ -192,5 +192,32 @@ class HtmlReport(unittest.TestCase):
             self.assertIn("PASS", content)
 
 
+class AuditCommand(unittest.TestCase):
+
+    def test_audit_pattern_only_dirty_blocks(self):
+        proc = revgate("audit", DIRTY, "--judge", "pattern", "--today", TODAY, "--no-record")
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("BLOCKED", proc.stdout)
+
+    def test_audit_pattern_only_clean_passes(self):
+        proc = revgate("audit", CLEAN, "--judge", "pattern", "--today", TODAY, "--no-record")
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("PASS", proc.stdout)
+
+    def test_audit_json_includes_phases_and_milestones(self):
+        proc = revgate("audit", DIRTY, "--judge", "pattern", "--format", "json",
+                       "--today", TODAY, "--no-record")
+        self.assertEqual(proc.returncode, 2)
+        parsed = json.loads(proc.stdout)
+        self.assertIn("phases", parsed)
+        self.assertIn("milestones", parsed)
+        self.assertIn("plan", parsed)
+
+    def test_audit_max_workers_flag_exists(self):
+        proc = revgate("audit", "--help")
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("--max-workers", proc.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

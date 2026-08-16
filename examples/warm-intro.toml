@@ -1,0 +1,35 @@
+# Example revgate.toml for a warm intro / referral motion.
+#
+# Warm intros are lower risk than cold outbound because the prospect has
+# opted in via a mutual contact. The compliance gates are relaxed (no
+# restricted-state blocking) but data quality gates remain.
+#
+# Usage:
+#   revgate lint -c examples/warm-intro.toml leads.csv
+
+strict = false
+
+# No restricted states for warm intros — the prospect has opted in.
+restricted_states = []
+
+# DNC staleness is less critical for warm intros, but still checked.
+dnc_stale_days = 90
+
+# Enrichment can be older — warm-intro leads are often referrals from
+# existing customers, so their data is already known.
+stale_enrichment_days = 180
+
+# Title exclusions are relaxed — you may want to reach individual
+# contributors for warm intros.
+title_exclude_keywords = ["intern", "student"]
+
+# Higher headcount ceiling — warm intros can target enterprise.
+headcount_ceiling = 50000
+
+calling_hours_start = 8
+calling_hours_end = 19
+
+# Email can be longer for warm intros — you have more context.
+email_max_length = 500
+email_max_links = 2
+email_max_ctas = 1

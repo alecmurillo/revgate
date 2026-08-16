@@ -1,0 +1,45 @@
+# Example revgate.toml for a cold outbound motion.
+#
+# Cold outbound is the highest-scrutiny motion: you are contacting people
+# who did not ask to hear from you. The gates below are tuned to be
+# aggressive about data quality and compliance.
+#
+# Usage:
+#   revgate lint -c examples/cold-outbound.toml leads.csv
+
+# P0 findings block the pipeline. P1 findings are advisory unless --strict.
+strict = false
+
+# Restricted jurisdictions — states where you cannot cold-call or cold-email
+# without specific registration. Add your own based on your legal review.
+restricted_states = ["NY", "FL", "TN"]
+
+# DNC staleness: how many days before a DNC check is considered stale and
+# must be re-verified. 31 days is the industry standard.
+dnc_stale_days = 31
+
+# Enrichment staleness: how many days before enrichment data (headcount,
+# industry, title) is considered stale and must be refreshed.
+stale_enrichment_days = 90
+
+# Title keywords that indicate the person is NOT a decision-maker for
+# your ICP. Leads with these titles get a P1 finding.
+title_exclude_keywords = ["intern", "student", "assistant", "coordinator"]
+
+# Headcount ceiling: if a company's headcount is above this, the lead is
+# flagged as out-of-ICP. Adjust for your motion.
+headcount_ceiling = 5000
+
+# Calling hours: revgate will flag leads scheduled outside these hours.
+# Times are in the lead's local timezone (24-hour format).
+calling_hours_start = 9
+calling_hours_end = 17
+
+# Email limits for first-touch emails.
+email_max_length = 300
+email_max_links = 1
+email_max_ctas = 1
+
+# Suppression sources — files of accounts and phone numbers to exclude.
+# suppress = "data/accounts-in-play.csv"
+# dnc = "data/dnc-list.csv"

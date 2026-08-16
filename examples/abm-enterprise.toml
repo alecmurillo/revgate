@@ -1,0 +1,36 @@
+# Example revgate.toml for an ABM / enterprise motion.
+#
+# Account-based marketing targets a small number of high-value accounts.
+# The gates are tuned for precision: strict title filtering, tight
+# headcount range, and aggressive enrichment staleness.
+#
+# Usage:
+#   revgate lint -c examples/abm-enterprise.toml leads.csv
+
+strict = true
+
+# ABM is always US-based for this example.
+restricted_states = []
+
+# DNC must be very fresh for enterprise deals.
+dnc_stale_days = 14
+
+# Enrichment must be very fresh — enterprise data changes quickly.
+stale_enrichment_days = 30
+
+# Strict title filtering — only decision-makers and influencers.
+title_exclude_keywords = [
+    "intern", "student", "assistant", "coordinator",
+    "junior", "trainee", "contractor",
+]
+
+# Tight headcount range — enterprise only.
+headcount_ceiling = 100000
+
+calling_hours_start = 9
+calling_hours_end = 17
+
+# Short, personalized emails for enterprise.
+email_max_length = 200
+email_max_links = 1
+email_max_ctas = 1

@@ -431,26 +431,42 @@ production.
 
 ## Multi-agent audit
 
-`revgate audit leads.csv --judge droid` runs a three-phase multi-agent workflow:
+`revgate audit leads.csv --judge droid` runs a five-phase multi-agent workflow
+that demonstrates a task decomposed across agents with clear milestones:
 
-- **Phase 1 — Pattern gates.** The existing twenty-two gates, no agent. Same
-  findings `lint` produces.
-- **Phase 2 — Agent review.** Findings are grouped by rule, and each group is
-  delegated to a separate `droid exec` session that reviews for true positives,
-  false positives, and remediation. This is a task split across agents with clear
-  milestones: each rule group is a separate session, and each session is a
-  milestone.
-- **Phase 3 — Synthesis.** Agent assessments are collected into a final report.
+- **Phase 0 — Planning.** Pattern gates run first (no agent). Findings are
+  grouped by rule. A review plan is generated listing what will be evaluated,
+  how many sessions will run, and what each session will check. Milestone 1.
+- **Phase 1 — Pattern gates.** The existing twenty-two gates produce the
+  deterministic baseline. Same findings `lint` produces. Milestone 2.
+- **Phase 2 — Parallel agent review.** One `droid exec` session per finding
+  group, run **in parallel** using `ThreadPoolExecutor`. Each session reviews
+  its rule's findings for true positives, false positives, and remediation
+  advice. The work is decomposed by rule group, not run sequentially. Milestone 3.
+- **Phase 3 — Cross-validation synthesis.** A final `droid exec` session
+  reviews all individual assessments for consistency, flags disagreements
+  between reviewers, and produces an overall recommendation. This agent's job
+  is to check the other agents' work. Milestone 4.
+- **Phase 4 — Final report.** All phases are collected into a structured
+  report with milestone checkpoints, session IDs, and provenance. Milestone 5.
 
-If `droid` is not available, phase 2 reports its findings as unjudged and the
-audit blocks — fail-closed, the same invariant as everywhere else. The agent
-review is not decorative.
+If `droid` is not available, phases 2-3 report as unjudged and the audit blocks
+— fail-closed, the same invariant as everywhere else. An unevaluated finding
+group is not a confirmed finding group.
 
-`--judge pattern` (the default) runs phase 1 only and is equivalent to `lint`:
+`--judge pattern` (the default) runs phases 0-1 only and is equivalent to `lint`:
 
 ```bash
 python3 -m revgate audit fixtures/leads-dirty.csv --judge pattern
 ```
+
+With droid, the full multi-agent audit runs in parallel:
+
+```bash
+python3 -m revgate audit fixtures/leads-dirty.csv --judge droid --max-workers 4
+```
+
+`--max-workers` controls how many `droid exec` sessions run concurrently (default 4).
 
 ---
 
@@ -480,7 +496,7 @@ undocumented, because a manifest that lags the code stops being evidence.
 | **3 custom droids** | `list-gate-reviewer` blocks any gate that can pass a row it never evaluated. `scenario-author` writes scenarios and validates them against the unsafe demo agent. `origin-auditor` attacks this repository's own claims, including [NOVELTY.md](NOVELTY.md). |
 | **Hooks** | `PostToolUse` lints a lead-list CSV the moment it is written. `PreToolUse` refuses a `git commit` that would stage a blocked list. |
 | **`droid exec`** | `--judge droid` delegates assertions no regex can make to the operator's existing Droid session. No second API key. Every judgement records its `session_id`. |
-| **Multi-agent audit** | `revgate audit --judge droid` splits the audit across multiple `droid exec` sessions — one per finding group — with each session reviewing for true positives and false positives. This is a task decomposed across agents with clear milestones: pattern gates (milestone 1), per-rule agent reviews (milestones 2-N), synthesis (final milestone). |
+| **Multi-agent audit** | `revgate audit --judge droid` splits the audit across multiple `droid exec` sessions — one per finding group, run **in parallel** — with a cross-validation synthesis session that checks the other agents' work. Five phases, five milestones: planning, pattern gates, parallel review, cross-validation, final report. |
 | **CI** | One credential-free job asserting the exit-code contract, one `droid exec` job that runs the reviewer droids on changed gates. |
 
 **Droid as runtime, not dependency.** The semantic judge shells out to
@@ -541,6 +557,82 @@ Read that before deciding what this is worth.
 
 ---
 
+## Configuring for your motion
+
+The default `revgate.toml` is tuned for cold outbound. Different motions need
+different gate thresholds. Example configs live in `examples/`:
+
+| Config | Motion | What changes |
+|---|---|---|
+| [`cold-outbound.toml`](examples/cold-outbound.toml) | Cold email/calling | Aggressive compliance (restricted states, DNC staleness 31d), tight title filtering |
+| [`warm-intro.toml`](examples/warm-intro.toml) | Referral / warm intro | No restricted states, relaxed staleness (90d/180d), higher headcount ceiling |
+| [`abm-enterprise.toml`](examples/abm-enterprise.toml) | Account-based marketing | Strict mode, fresh enrichment (30d), tight title filtering, short emails |
+
+```bash
+python3 -m revgate lint -c examples/cold-outbound.toml leads.csv
+python3 -m revgate lint -c examples/warm-intro.toml leads.csv
+python3 -m revgate lint -c examples/abm-enterprise.toml leads.csv
+```
+
+---
+
+## Production deployment
+
+The API server is stdlib-only and runs as a single process. For production:
+
+**Docker** (simplest path):
+
+```bash
+docker build -t revgate .
+docker run -p 8000:8000 -e REVGATE_API_KEY=your-secret revgate
+```
+
+The Dockerfile installs the package and runs `revgate serve --port 8000`. Mount
+your `revgate.toml` to override defaults:
+
+```bash
+docker run -p 8000:8000 -e REVGATE_API_KEY=your-secret \
+  -v $(pwd)/revgate.toml:/app/revgate.toml revgate
+```
+
+**Behind a reverse proxy** (recommended for TLS and rate limiting):
+
+```
+nginx/Traffic Manager → revgate serve (port 8000)
+```
+
+The server is stateless — each request is evaluated independently. Run
+multiple containers behind a load balancer for higher concurrency.
+
+**Writeback** (optional): After evaluating rows, you can POST verdicts back to
+Clay or HubSpot so downstream teams see the quality flags in their workflow tool.
+Writeback adapters use stdlib `urllib` (no extra dependencies) and require API
+keys:
+
+```python
+from revgate.api.writeback import writeback_clay, writeback_hubspot
+
+# Clay: needs CLAY_SOURCE_ID (the Clay source to update)
+results = writeback_clay(api_key="sk-...", rows=evaluated_rows, source_id="src_123")
+
+# HubSpot: external_id is the HubSpot contact ID
+results = writeback_hubspot(api_key="pat-...", rows=evaluated_rows)
+```
+
+Both are fail-closed: if a writeback call fails, the error is returned, never
+silently swallowed.
+
+**Shell target** (for testing your own agent): The `shell` target lets you
+red-team any agent that can speak JSON on stdin/stdout, in any language. An
+example agent with intentional bugs lives in `examples/test_agent.py`:
+
+```bash
+REVGATE_TARGET_CMD="python3 examples/test_agent.py" \
+  python3 -m revgate redteam --target shell
+```
+
+---
+
 ## Layout
 
 ```
@@ -549,11 +641,12 @@ revgate/
   lists/        the twenty-two gates and their runner
   agents/       battery loader, target adapters, judges, scenario runner
   batteries/    adversarial scenarios (TOML)
-  api/          HTTP gating server, source adapters (Clay/HubSpot/Apollo)
+  api/          HTTP gating server, source adapters (Clay/HubSpot/Apollo), writeback
   provenance.py verifies factory-usage.toml, records run history
-  audit.py      multi-agent audit: pattern gates + droid exec review
-  cli.py        lint · redteam · diff · provenance · rules · scenarios
-fixtures/       dirty and clean lead lists, suppression and DNC exports
+  audit.py      multi-agent audit: 5 phases, parallel droid exec, cross-validation
+  cli.py        lint · redteam · diff · provenance · rules · scenarios · serve · audit
+fixtures/       dirty and clean lead lists, suppression and DNC exports, API fixtures
+examples/       test agent script, example configs for different motions
 .factory/       skills, custom droids, hooks
 tests/          unit tests, no network
 ```

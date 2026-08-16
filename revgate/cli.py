@@ -271,7 +271,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     cfg = _base_config(args)
     use_droid = args.judge == "droid"
     try:
-        result = audit(args.leads, cfg, use_droid=use_droid)
+        result = audit(args.leads, cfg, use_droid=use_droid, max_workers=getattr(args, "max_workers", 4))
     except FileNotFoundError as exc:
         print(f"revgate: {exc}", file=sys.stderr)
         return EXIT_USAGE
@@ -367,6 +367,8 @@ def build_parser() -> argparse.ArgumentParser:
     aud.add_argument("leads", help="CSV of leads to audit")
     aud.add_argument("--judge", choices=("pattern", "droid"), default="pattern",
                       help="pattern only (default) or add droid exec review per finding group")
+    aud.add_argument("--max-workers", type=int, default=4,
+                      help="max parallel droid exec sessions (default: 4)")
     aud.add_argument("--suppress", help="CSV of accounts already in play")
     aud.add_argument("--dnc", help="CSV of suppressed phone numbers")
     aud.add_argument("--only", help="run only these gates, e.g. L001,L003")

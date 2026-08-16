@@ -1,8 +1,8 @@
 """Tests for the multi-agent audit command.
 
-Tests the pattern-only path (no droid needed) and the structure of the
-agent review. The droid exec path is tested for fail-closed behavior when
-the droid CLI is not available.
+Tests the pattern-only path, parallel agent review, cross-validation
+synthesis, milestone reporting, and fail-closed behavior when droid is
+unavailable.
 """
 
 import json
@@ -10,12 +10,15 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
 
-from revgate.audit import audit, render_audit_text, render_audit_json, AgentReview, AuditResult
+from revgate.audit import (
+    audit, render_audit_text, render_audit_json,
+    AgentReview, AuditResult, ReviewPlan, SynthesisReview, Milestone,
+)
 from revgate.core.config import Config
 from revgate.core.findings import Result, Finding, Severity
 
@@ -31,7 +34,7 @@ class TestAuditPatternOnly(unittest.TestCase):
         self.assertEqual(result.verdict, "BLOCKED")
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(len(result.agent_reviews), 0)
-        self.assertIn("Phase 1", result.phases[0])
+        self.assertIsNone(result.synthesis)
 
     def test_clean_list_passes(self):
         result = audit(FIXTURES / "leads-clean.csv", self.cfg, use_droid=False)
@@ -42,6 +45,7 @@ class TestAuditPatternOnly(unittest.TestCase):
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
         text = render_audit_text(result)
         self.assertIn("revgate audit", text)
+        self.assertIn("Phase 0", text)
         self.assertIn("Phase 1", text)
 
     def test_json_render(self):
@@ -50,20 +54,34 @@ class TestAuditPatternOnly(unittest.TestCase):
         parsed = json.loads(js)
         self.assertEqual(parsed["verdict"], "BLOCKED")
         self.assertIn("phases", parsed)
-        self.assertEqual(parsed["agent_reviews"], [])
+        self.assertIn("milestones", parsed)
+        self.assertIn("plan", parsed)
 
-    def test_phases_list(self):
+    def test_plan_generated(self):
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
-        self.assertEqual(len(result.phases), 1)
-        self.assertIn("Pattern gates", result.phases[0])
+        self.assertIsNotNone(result.plan)
+        self.assertGreater(result.plan.total_findings, 0)
+        self.assertGreater(len(result.plan.rule_groups), 0)
+        self.assertGreater(result.plan.estimated_sessions, 0)
+
+    def test_milestones_present(self):
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
+        self.assertGreaterEqual(len(result.milestones), 2)  # planning + pattern-gates
+        for m in result.milestones:
+            self.assertIn(m.phase, ("planning", "pattern-gates", "parallel-review", "cross-validation", "final-report"))
+            self.assertIn(m.status, ("complete", "skipped", "partial", "unjudged"))
+
+    def test_phases_include_planning(self):
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
+        self.assertTrue(any("Phase 0" in p for p in result.phases))
+        self.assertTrue(any("Phase 1" in p for p in result.phases))
 
 
-class TestAuditDroid(unittest.TestCase):
+class TestAuditDroidUnavailable(unittest.TestCase):
     def setUp(self):
         self.cfg = Config()
 
     def test_droid_not_available_fails_closed(self):
-        """When droid is not on PATH, agent reviews are unjudged and the audit blocks."""
         with patch("revgate.audit.shutil.which", return_value=None):
             result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
         self.assertEqual(result.verdict, "BLOCKED")
@@ -73,95 +91,106 @@ class TestAuditDroid(unittest.TestCase):
             self.assertEqual(review.session_id, "")
             self.assertTrue(review.error)
 
-    def test_droid_phases_include_all_three(self):
+    def test_milestones_show_unjudged(self):
         with patch("revgate.audit.shutil.which", return_value=None):
             result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        # Phase 1, Phase 2 (with unjudged), Phase 3
-        self.assertGreaterEqual(len(result.phases), 2)
+        parallel_ms = [m for m in result.milestones if m.phase == "parallel-review"]
+        self.assertEqual(len(parallel_ms), 1)
+        self.assertEqual(parallel_ms[0].sessions, 0)
 
-    def test_unjudged_groups_count(self):
+    def test_synthesis_unjudged_when_droid_unavailable(self):
         with patch("revgate.audit.shutil.which", return_value=None):
             result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        self.assertGreater(result.unjudged_groups, 0)
+        self.assertIsNotNone(result.synthesis)
+        self.assertEqual(result.synthesis.overall, "unjudged")
+        self.assertTrue(result.synthesis.error)
 
     def test_agent_sessions_zero_when_unavailable(self):
         with patch("revgate.audit.shutil.which", return_value=None):
             result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
         self.assertEqual(result.agent_sessions, 0)
 
-    def test_json_includes_agent_reviews(self):
+    def test_json_includes_milestones_and_synthesis(self):
         with patch("revgate.audit.shutil.which", return_value=None):
             result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
         js = render_audit_json(result)
         parsed = json.loads(js)
-        self.assertGreater(len(parsed["agent_reviews"]), 0)
-        for review in parsed["agent_reviews"]:
-            self.assertEqual(review["verdict"], "unjudged")
-
-    def test_text_shows_unjudged_warning(self):
-        with patch("revgate.audit.shutil.which", return_value=None):
-            result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        text = render_audit_text(result)
-        self.assertIn("could not be evaluated", text)
+        self.assertIn("milestones", parsed)
+        self.assertIn("synthesis", parsed)
+        self.assertEqual(parsed["synthesis"]["overall"], "unjudged")
 
 
 class TestAuditMockedDroid(unittest.TestCase):
-    """Test with a mocked droid exec that returns a confirmed verdict."""
+    """Test with mocked droid exec that returns confirmed verdicts."""
 
     def setUp(self):
         self.cfg = Config()
 
-    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
-    @patch("revgate.audit.subprocess.run")
-    def test_mocked_droid_confirmed(self, mock_run, mock_which):
-        mock_run.return_value = type(
-            "CompletedProcess", (),
-            {
-                "returncode": 0,
-                "stdout": json.dumps({
-                    "session_id": "test-session-abc",
-                    "duration_ms": 1500,
-                    "num_turns": 1,
-                    "is_error": False,
-                    "result": '{"verdict": "confirmed", "true_positives": 3, "false_positives": 0, "remediation": "Remove blocked rows"}',
-                }),
-                "stderr": "",
-            },
+    @staticmethod
+    def _mock_droid_response(*args, **kwargs):
+        """Return review or synthesis response based on prompt content."""
+        argv = args[0] if args else kwargs.get("args", [])
+        tmp_file = [a for a in argv if a.endswith(".md")]
+        if tmp_file:
+            content = Path(tmp_file[0]).read_text()
+            if "synthesis reviewer" in content:
+                return MagicMock(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "session_id": "synth-session",
+                        "duration_ms": 2000,
+                        "num_turns": 1,
+                        "is_error": False,
+                        "result": '{"overall": "blocked", "disagreements": [], "recommendation": "Fix all P0 issues"}',
+                    }),
+                    stderr="",
+                )
+        return MagicMock(
+            returncode=0,
+            stdout=json.dumps({
+                "session_id": "test-session-abc",
+                "duration_ms": 1500,
+                "num_turns": 1,
+                "is_error": False,
+                "result": '{"verdict": "confirmed", "true_positives": 3, "false_positives": 0, "remediation": "Remove blocked rows"}',
+            }),
+            stderr="",
         )
 
-        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_mocked_droid_confirmed_parallel(self, mock_run, mock_which):
+        """Multiple sessions run in parallel and all return confirmed."""
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True, max_workers=2)
         self.assertGreater(len(result.agent_reviews), 0)
-        review = result.agent_reviews[0]
-        self.assertEqual(review.verdict, "confirmed")
-        self.assertEqual(review.true_positives, 3)
-        self.assertEqual(review.false_positives, 0)
-        self.assertEqual(review.session_id, "test-session-abc")
-        self.assertEqual(review.remediation, "Remove blocked rows")
-        self.assertGreater(result.agent_sessions, 0)
-        self.assertEqual(result.unjudged_groups, 0)
+        for review in result.agent_reviews:
+            self.assertEqual(review.verdict, "confirmed")
+            self.assertEqual(review.session_id, "test-session-abc")
+            self.assertGreater(review.duration_ms, 0)
+
+        # Synthesis should also have run.
+        self.assertIsNotNone(result.synthesis)
+        self.assertEqual(result.synthesis.overall, "blocked")
 
     @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
     @patch("revgate.audit.subprocess.run")
-    def test_mocked_droid_false_positive(self, mock_run, mock_which):
-        mock_run.return_value = type(
-            "CompletedProcess", (),
-            {
-                "returncode": 0,
-                "stdout": json.dumps({
-                    "session_id": "test-session-fp",
-                    "duration_ms": 1200,
-                    "num_turns": 1,
-                    "is_error": False,
-                    "result": '{"verdict": "false_positive", "true_positives": 0, "false_positives": 2, "remediation": "Review these rows manually"}',
-                }),
-                "stderr": "",
-            },
-        )
+    def test_mocked_droid_milestone_count(self, mock_run, mock_which):
+        mock_run.side_effect = self._mock_droid_response
 
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        review = result.agent_reviews[0]
-        self.assertEqual(review.verdict, "false_positive")
-        self.assertEqual(review.false_positives, 2)
+        # Should have 5 milestones: planning, pattern-gates, parallel-review, cross-validation, final-report
+        self.assertEqual(len(result.milestones), 5)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_mocked_droid_phases_count(self, mock_run, mock_which):
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        # Should have 5 phases: 0, 1, 2, 3, 4
+        self.assertEqual(len(result.phases), 5)
 
     @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
     @patch("revgate.audit.subprocess.run")
@@ -173,6 +202,65 @@ class TestAuditMockedDroid(unittest.TestCase):
         review = result.agent_reviews[0]
         self.assertEqual(review.verdict, "unjudged")
         self.assertIn("timed out", review.error)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_agent_sessions_count_includes_synthesis(self, mock_run, mock_which):
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        # agent_sessions includes both review sessions and the synthesis session
+        self.assertGreater(result.agent_sessions, len(result.agent_reviews))
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_json_includes_synthesis_with_disagreements(self, mock_run, mock_which):
+        def mock_with_disagreements(*args, **kwargs):
+            argv = args[0] if args else kwargs.get("args", [])
+            tmp_file = [a for a in argv if a.endswith(".md")]
+            if tmp_file:
+                content = Path(tmp_file[0]).read_text()
+                if "synthesis reviewer" in content:
+                    return MagicMock(
+                        returncode=0,
+                        stdout=json.dumps({
+                            "session_id": "synth-session",
+                            "duration_ms": 2000,
+                            "num_turns": 1,
+                            "is_error": False,
+                            "result": '{"overall": "blocked", "disagreements": ["L004: reviewer says confirmed but data looks stale"], "recommendation": "Fix P0 issues before sending"}',
+                        }),
+                        stderr="",
+                    )
+            return MagicMock(
+                returncode=0,
+                stdout=json.dumps({
+                    "session_id": "test-session",
+                    "duration_ms": 1000,
+                    "num_turns": 1,
+                    "is_error": False,
+                    "result": '{"verdict": "confirmed", "true_positives": 1, "false_positives": 0, "remediation": "Fix"}',
+                }),
+                stderr="",
+            )
+        mock_run.side_effect = mock_with_disagreements
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        js = render_audit_json(result)
+        parsed = json.loads(js)
+        self.assertEqual(parsed["synthesis"]["overall"], "blocked")
+        self.assertGreater(len(parsed["synthesis"]["disagreements"]), 0)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_text_shows_milestones_and_synthesis(self, mock_run, mock_which):
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        text = render_audit_text(result)
+        self.assertIn("Milestones:", text)
+        self.assertIn("Cross-validation synthesis:", text)
+        self.assertIn("Plan:", text)
 
 
 if __name__ == "__main__":
