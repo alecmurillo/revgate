@@ -301,9 +301,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"revgate {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    def common(p: argparse.ArgumentParser) -> None:
+    def common(p: argparse.ArgumentParser, *, formats: tuple[str, ...] = ("text", "md", "json", "html")) -> None:
         p.add_argument("-c", "--config", help=f"path to a config file (default: nearest revgate.toml)")
-        p.add_argument("-f", "--format", choices=("text", "md", "json", "html"), default="text")
+        p.add_argument("-f", "--format", choices=formats, default="text")
         p.add_argument("-o", "--out", help="write the report here instead of stdout")
         p.add_argument("--strict", action="store_true", help="exit 1 on P1 findings as well as P0")
         p.add_argument("--no-record", action="store_true", help="do not append a run record under .revgate/runs")
@@ -330,7 +330,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     prov = sub.add_parser("provenance", help="verify how this repo uses Factory, or show run history")
     prov.add_argument("--runs", action="store_true", help="summarise recorded runs instead of verifying claims")
-    common(prov)
+    common(prov, formats=("text", "json"))
     prov.set_defaults(func=cmd_provenance)
 
     dif = sub.add_parser("diff", help="compare two lead lists and re-gate the rows that changed")
@@ -373,7 +373,7 @@ def build_parser() -> argparse.ArgumentParser:
     aud.add_argument("--dnc", help="CSV of suppressed phone numbers")
     aud.add_argument("--only", help="run only these gates, e.g. L001,L003")
     aud.add_argument("--today", help="pin the reference date (YYYY-MM-DD)")
-    common(aud)
+    common(aud, formats=("text", "json"))
     aud.set_defaults(func=cmd_audit)
 
     return parser

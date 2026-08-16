@@ -75,12 +75,13 @@ revgate agents · demo · sales-intake
   scenarios 27 · passed 6 · failed 21 · partial 0 · errored 0 · judge pattern
 ```
 
-Twenty adversarial scenarios caught it. Six scenarios written to be passed were
+Twenty-one adversarial scenarios caught it. Six scenarios written to be passed were
 passed. That second number is the one that matters: a battery where everything
 fails cannot tell a broken guardrail from a broken matcher.
 
-`--today` is there because the fixtures contain dates and one gate is about
-recency. Pinning it keeps the output reproducible in 2027.
+`--today` is there because the fixtures contain dates and three gates depend on
+the reference date (recent contact, stale enrichment, DNC staleness). Pinning
+it keeps the output reproducible.
 
 **Or run the whole tour at once,** which asserts every documented exit code as it
 goes:
@@ -131,6 +132,11 @@ prevents.
 | P1 | `L015` stale-enrichment | Data verified months ago; a clean list at build time is not clean at send time |
 | P2 | `L016` missing-recipient | No name on the row; the personalisation sends to "Hi there" |
 | P2 | `L017` title-scope | Title indicates the wrong seniority for the motion (intern, assistant) |
+| P0 | `L018` dnc-source-staleness | DNC file hasn't been refreshed within the legal 31-day window |
+| P0 | `L019` calling-hours | Send/call time outside legal calling hours (8am-9pm, 9am-8pm in CT) |
+| P2 | `L020` email-length | First-touch copy exceeds 150 words; long emails convert worse |
+| P1 | `L021` links-in-first-email | Links in first-touch emails trigger spam filters and lower deliverability |
+| P2 | `L022` multiple-ctas | Multiple calls-to-action dilute the ask and reduce reply rate |
 
 ## How to read this report
 
@@ -347,7 +353,7 @@ suppression = "fixtures/crm-export.csv"   # missing file => blocking skip
 dnc = "fixtures/dnc.csv"
 
 [lint.columns]
-domain = ["domain", "website", "company_domain"]
+domain = "domain"
 
 [redteam]
 battery = "revgate/batteries/sales-intake.toml"
@@ -365,7 +371,7 @@ self-contained dark-theme report for sharing with non-technical stakeholders.
 python3 -m revgate diff old-leads.csv new-leads.csv --today 2026-08-16
 ```
 
-Matches rows by domain (or `--key email`), reports accounts added, removed, and
+Matches rows by domain (or `--key email` or `--key company`), reports accounts added, removed, and
 changed, then runs every gate on the new and changed rows only. Same exit-code
 contract: 2 if any new or changed row is blocked, 0 if clean.
 
@@ -385,13 +391,13 @@ invariant that a check which could not run is never a pass extends to the wire.
 The response carries per-row writeback fields designed to map straight back into
 the source tool's columns:
 
-- `revgate_status` — `PASS` or `BLOCKED`
+- `revgate_status` — `PASS`, `ADVISORY`, or `BLOCKED`
 - `revgate_severity` — highest severity that fired (`P0`, `P1`, `P2`, or empty)
-- `revgate_rules` — list of rule codes that fired (e.g. `["L003", "L006"]`)
+- `revgate_rules` — comma-separated rule codes that fired (e.g. `"L003, L006"`)
 - `revgate_summary` — one-line human summary of the findings
 - `revgate_checked_at` — ISO-8601 timestamp of the check
 
-HTTP status branches without parsing the body: **200 for PASS, 422 for BLOCKED.**
+HTTP status branches without parsing the body: **200 for PASS or ADVISORY, 422 for BLOCKED.**
 
 Quickstart:
 
@@ -528,7 +534,7 @@ revgate run history · 41 run(s)
   zero findings.
 - A semantic assertion that no judge evaluated is reported as unjudged and blocks.
   It is not quietly downgraded.
-- Skipped checks print **above** findings in every output format, because the
+- Blocking skips print **above** findings in every output format, because the
   absence of suppression findings means nothing if the suppression gate never ran.
 - The hook blocks a list it could not evaluate, not just a list that failed.
 
@@ -566,7 +572,7 @@ different gate thresholds. Example configs live in `examples/`:
 |---|---|---|
 | [`cold-outbound.toml`](examples/cold-outbound.toml) | Cold email/calling | Aggressive compliance (restricted states, DNC staleness 31d), tight title filtering |
 | [`warm-intro.toml`](examples/warm-intro.toml) | Referral / warm intro | No restricted states, relaxed staleness (90d/180d), higher headcount ceiling |
-| [`abm-enterprise.toml`](examples/abm-enterprise.toml) | Account-based marketing | Strict mode, fresh enrichment (30d), tight title filtering, short emails |
+| [`abm-enterprise.toml`](examples/abm-enterprise.toml) | Account-based marketing | Strict mode, fresh enrichment (30d), tight title filtering, wide contact window |
 
 ```bash
 python3 -m revgate lint -c examples/cold-outbound.toml leads.csv

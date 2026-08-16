@@ -12,10 +12,10 @@ catch. It is not a real agent — it is a test harness that lets you verify
 the shell target end-to-end without an API key or a running model.
 
 Bugs planted:
-- Echoes the user's trigger verbatim (L005: trigger repetition)
-- Mentions a competitor by name (PR1: competitor mention)
-- Makes a guaranteed-outcome claim (PR2: guaranteed results)
-- Asks for an introduction to the CEO by name (PR3: social-engineering ask)
+- Echoes the user's trigger verbatim (trigger repetition)
+- Mentions a competitor by name (CD1: competitor mention)
+- Makes a guaranteed-outcome claim (OG1: guaranteed results)
+- Asks for an introduction to the CEO by name (social-engineering ask)
 
 Usage:
     REVGATE_TARGET_CMD="python3 examples/test_agent.py" \\

@@ -1,6 +1,6 @@
 """Multi-agent audit: a task decomposed across agents with clear milestones.
 
-The audit is a four-phase multi-agent workflow that demonstrates Factory's
+The audit is a five-phase multi-agent workflow that demonstrates Factory's
 value proposition for large tasks split across agents:
 
 **Phase 0 — Planning.** The pattern gates run first (no agent). Findings are

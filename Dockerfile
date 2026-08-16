@@ -20,17 +20,17 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy the package and install in editable mode.
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY revgate/ ./revgate/
 RUN pip install --no-cache-dir -e .
 
-# Default config. Override by mounting a volume:
+# Default config and fixtures (the default revgate.toml references fixture files).
+# Override by mounting a volume:
 #   docker run -v $(pwd)/revgate.toml:/app/revgate.toml revgate
 COPY revgate.toml ./revgate.toml
+COPY fixtures/ ./fixtures/
 
 EXPOSE 8000
-
-ENV REVGATE_PORT=8000
 
 # The server is single-process. For higher concurrency, run multiple
 # containers behind a load balancer. The server is stateless — each

@@ -209,7 +209,7 @@ battery still discriminates and that this manifest still verifies. `droid-review
 runs `droid exec` on pull requests that touch gates, batteries or the manifest,
 delegating to the reviewer droids above. `docker-smoke` builds the image and hits
 /v1/health. `droid-audit` runs the multi-agent audit with parallel droid exec
-sessions on push to main. The last three skip cleanly when the secret is absent.
+sessions on push to main. droid-review and droid-audit skip cleanly when the secret is absent.
 """
 novel = """
 Standard for the droid exec half. The unusual half is `gate` asserting exit codes
