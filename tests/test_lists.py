@@ -295,5 +295,78 @@ class MultipleCTAsOverlap(unittest.TestCase):
             Path(tmp.name).unlink()
 
 
+class CleanInputPerGate(unittest.TestCase):
+    """G5: each gate must NOT fire on clean input that should pass it.
+
+    Table-driven, like PipedExitCodes. Each case provides a row that is clean
+    for exactly one gate, and asserts that gate produces no finding.
+    """
+
+    CLEAN_CASES = [
+        # (rule_id, csv_header, csv_row)
+        ("L001", "company,domain,email\n", "Acme,acme.com,bob@acme.com\n"),
+        ("L002", "company,domain,email,last_contacted\n",
+         "Acme,acme.com,bob@acme.com,2026-01-01\n"),
+        ("L003", "company,domain,email,phone\n",
+         "Acme,acme.com,bob@acme.com,4155550142\n"),
+        ("L004", "company,domain,email,state\n",
+         "Acme,acme.com,bob@acme.com,CA\n"),
+        ("L005", "company,domain,email,trigger\n",
+         "Acme,acme.com,bob@acme.com,opened a new DC in Reno\n"),
+        ("L006", "company,domain,email,copy\n",
+         "Acme,acme.com,bob@acme.com,Saw the new DC. Worth a call?\n"),
+        ("L007", "company,domain,email,email_status\n",
+         "Acme,acme.com,bob@acme.com,verified\n"),
+        ("L008", "company,domain,email\n",
+         "Acme,acme.com,bob@acme.com\n"),
+        ("L009", "company,domain,email\n",
+         "Acme Corp,acme.com,bob@acme.com\n"),
+        ("L010", "company,domain,email\n",
+         "Acme Corp,acme.com,bob@acme.com\n"),
+        ("L011", "company,domain,email,headcount\n",
+         "Acme,acme.com,bob@acme.com,50\n"),
+        ("L012", "company,domain,email,headcount\n",
+         "Acme,acme.com,bob@acme.com,50\n"),
+        ("L013", "company,domain,email\n",
+         "Acme,acme.com,bob@acme.com\n"),
+        ("L014", "company,domain,email,phone\n",
+         "Acme,acme.com,bob@acme.com,4155550142\n"),
+        ("L015", "company,domain,email,enriched_date\n",
+         "Acme,acme.com,bob@acme.com,2026-07-01\n"),
+        ("L016", "company,domain,email,first_name,last_name\n",
+         "Acme,acme.com,bob@acme.com,Bob,Smith\n"),
+        ("L017", "company,domain,email,title\n",
+         "Acme,acme.com,bob@acme.com,VP of Operations\n"),
+        ("L018", "company,domain,email,phone\n",
+         "Acme,acme.com,bob@acme.com,4155550142\n"),
+        ("L019", "company,domain,email,state,send_time\n",
+         "Acme,acme.com,bob@acme.com,NY,10:00 AM\n"),
+        ("L020", "company,domain,email,copy\n",
+         "Acme,acme.com,bob@acme.com,Saw the DC news. Worth a call?\n"),
+        ("L021", "company,domain,email,copy\n",
+         "Acme,acme.com,bob@acme.com,Saw the DC news. Worth a call?\n"),
+        ("L022", "company,domain,email,copy\n",
+         "Acme,acme.com,bob@acme.com,Saw the DC news. Worth a call?\n"),
+    ]
+
+    def test_clean_input_does_not_trip_gate(self):
+        for rule_id, header, row in self.CLEAN_CASES:
+            with self.subTest(rule=rule_id):
+                tmp = tempfile.NamedTemporaryFile(
+                    "w", suffix=".csv", delete=False, encoding="utf-8")
+                tmp.write(header + row)
+                tmp.close()
+                try:
+                    result = runner.run(Path(tmp.name), config())
+                    findings = [f for f in result.findings if f.rule == rule_id]
+                    self.assertEqual(
+                        findings, [],
+                        f"{rule_id} fired on clean input: "
+                        + ", ".join(f.detail for f in findings),
+                    )
+                finally:
+                    Path(tmp.name).unlink()
+
+
 if __name__ == "__main__":
     unittest.main()

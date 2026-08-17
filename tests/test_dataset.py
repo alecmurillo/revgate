@@ -98,6 +98,44 @@ class Phones(unittest.TestCase):
         self.assertEqual(norm_phone("+44 20 7946 0958"), "")
 
 
+class DelimiterSniffing(unittest.TestCase):
+    """CSV loader must detect semicolons and tabs, not just commas."""
+
+    def test_semicolon_delimited_csv(self):
+        tmp = write_csv("company;domain;email\nAcme;acme.com;bob@acme.com\n")
+        try:
+            ds = Dataset.load(str(tmp))
+            self.assertEqual(ds.headers, ["company", "domain", "email"])
+            self.assertEqual(ds.rows[0]["domain"], "acme.com")
+        finally:
+            tmp.unlink()
+
+    def test_tab_delimited_csv(self):
+        tmp = write_csv("company\tdomain\temail\nAcme\tacme.com\tbob@acme.com\n")
+        try:
+            ds = Dataset.load(str(tmp))
+            self.assertEqual(ds.headers, ["company", "domain", "email"])
+            self.assertEqual(ds.rows[0]["domain"], "acme.com")
+        finally:
+            tmp.unlink()
+
+    def test_comma_still_works(self):
+        tmp = write_csv("company,domain,email\nAcme,acme.com,bob@acme.com\n")
+        try:
+            ds = Dataset.load(str(tmp))
+            self.assertEqual(ds.headers, ["company", "domain", "email"])
+        finally:
+            tmp.unlink()
+
+    def test_explicit_delimiter_override(self):
+        tmp = write_csv("company;domain;email\nAcme;acme.com;bob@acme.com\n")
+        try:
+            ds = Dataset.load(str(tmp), delimiter=";")
+            self.assertEqual(ds.headers, ["company", "domain", "email"])
+        finally:
+            tmp.unlink()
+
+
 class Integers(unittest.TestCase):
     def test_thousands_separators(self):
         self.assertEqual(parse_int("1,200"), 1200)

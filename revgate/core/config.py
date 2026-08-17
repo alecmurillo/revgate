@@ -96,6 +96,9 @@ class Config:
     # rules to disable entirely
     disable: tuple[str, ...] = ()
 
+    # explicit CSV delimiter override (auto-detected by default)
+    delimiter: str | None = None
+
     # paths the pre-commit hook and CI treat as lead lists
     list_globs: tuple[str, ...] = ("lists/**/*.csv",)
 
@@ -169,6 +172,8 @@ class Config:
             cfg.acknowledge_unconfigured = tuple(str(r).upper() for r in lint["acknowledge_unconfigured"])
         if "disable" in lint:
             cfg.disable = tuple(str(r).upper() for r in lint["disable"])
+        if "delimiter" in lint:
+            cfg.delimiter = str(lint["delimiter"])
 
         red = data.get("redteam", {}) or {}
         if red.get("battery"):

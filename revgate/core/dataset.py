@@ -14,6 +14,37 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+
+def _sniff_dialect(fh, delimiter: str | None = None) -> csv.Dialect:
+    """Detect the delimiter by sampling the first 8KB.
+
+    Excel's European locale defaults to ``;`` and some tools export tab-delimited
+    files. Without sniffing, these parse as a single column and every gate skips.
+    Falls back to ``csv.excel`` (comma) when the sniffer is unsure.
+
+    If ``delimiter`` is set (from ``[lint].delimiter`` config), it overrides
+    sniffing entirely.
+    """
+    if delimiter:
+        # Build a dialect subclass with the explicit delimiter.
+        # Can't use a class body to capture the closure variable, so
+        # set it as an attribute after creation.
+        _Fixed = type("_Fixed", (csv.Dialect,), {
+            "delimiter": delimiter,
+            "quotechar": '"',
+            "doublequote": True,
+            "skipinitialspace": True,
+            "lineterminator": "\r\n",
+            "quoting": csv.QUOTE_MINIMAL,
+        })
+        return _Fixed
+    sample = fh.read(8192)
+    fh.seek(0)
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=",;\t|")
+    except csv.Error:
+        return csv.excel
+
 # Logical field -> header aliases, lowercased and stripped of non-alphanumerics
 # before comparison. Order matters: earlier aliases win.
 ALIASES: dict[str, tuple[str, ...]] = {
@@ -130,12 +161,14 @@ class Dataset:
     mapping: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, path: str | Path, overrides: dict[str, str] | None = None) -> "Dataset":
+    def load(cls, path: str | Path, overrides: dict[str, str] | None = None, *,
+             delimiter: str | None = None) -> "Dataset":
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"no such file: {p}")
         with p.open(newline="", encoding="utf-8-sig") as fh:
-            reader = csv.DictReader(fh)
+            dialect = _sniff_dialect(fh, delimiter=delimiter)
+            reader = csv.DictReader(fh, dialect=dialect)
             headers = [h for h in (reader.fieldnames or []) if h is not None]
             rows = [{(k or ""): (v if v is not None else "") for k, v in row.items()} for row in reader]
         ds = cls(path=p, headers=headers, rows=rows)
@@ -209,7 +242,8 @@ class Dataset:
         return len(self.rows)
 
 
-def load_key_set(path: str | Path, kinds: tuple[str, ...] = ("domain", "email", "phone")) -> dict[str, set[str]]:
+def load_key_set(path: str | Path, kinds: tuple[str, ...] = ("domain", "email", "phone"),
+                 *, delimiter: str | None = None) -> dict[str, set[str]]:
     """Load a reference export (CRM, do-not-call, prior campaign) into lookup sets.
 
     Accepts any CSV and harvests every column that looks like a domain, email or
@@ -221,7 +255,8 @@ def load_key_set(path: str | Path, kinds: tuple[str, ...] = ("domain", "email", 
         raise FileNotFoundError(f"no such file: {p}")
     out: dict[str, set[str]] = {k: set() for k in kinds}
     with p.open(newline="", encoding="utf-8-sig") as fh:
-        reader = csv.DictReader(fh)
+        dialect = _sniff_dialect(fh, delimiter=delimiter)
+        reader = csv.DictReader(fh, dialect=dialect)
         headers = [h for h in (reader.fieldnames or []) if h]
         by_key = {_key(h): h for h in headers}
         cols: dict[str, list[str]] = {k: [] for k in kinds}

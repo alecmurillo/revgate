@@ -18,7 +18,8 @@ from .rules import RULES, RULES_BY_ID, Context, Rule
 def _load_sources(cfg: Config, ctx: Context) -> None:
     if cfg.suppression is not None:
         try:
-            ctx.suppression = load_key_set(cfg.suppression, kinds=("domain", "email"))
+            ctx.suppression = load_key_set(cfg.suppression, kinds=("domain", "email"),
+                                           delimiter=cfg.delimiter)
             ctx.suppression_path = Path(cfg.suppression)
         except FileNotFoundError:
             ctx.suppression = {"domain": set(), "email": set()}
@@ -31,7 +32,7 @@ def _load_sources(cfg: Config, ctx: Context) -> None:
 
     if cfg.dnc is not None:
         try:
-            ctx.dnc = load_key_set(cfg.dnc, kinds=("phone",))["phone"]
+            ctx.dnc = load_key_set(cfg.dnc, kinds=("phone",), delimiter=cfg.delimiter)["phone"]
             ctx.dnc_path = Path(cfg.dnc)
         except FileNotFoundError:
             ctx.dnc = set()
@@ -61,7 +62,7 @@ def select_rules(only: list[str] | None = None) -> list[Rule]:
 
 
 def run(path: str | Path, cfg: Config, only: list[str] | None = None) -> Result:
-    ds = Dataset.load(path, overrides=cfg.columns)
+    ds = Dataset.load(path, overrides=cfg.columns, delimiter=cfg.delimiter)
     return run_on_dataset(ds, cfg, only, target=str(Path(path)))
 
 
