@@ -3,6 +3,65 @@
 A practical guide for someone who cloned the repo and wants to see it work.
 No prior knowledge of the codebase required.
 
+---
+
+## When to use revgate
+
+revgate is a QA layer between data generation and outbound execution. It catches
+mistakes that cost money or create legal exposure before they reach a prospect.
+
+**Use it when you are about to send a lead list or ship an AI agent that talks to
+customers.** Specifically:
+
+- **Before a cold outbound send.** You built a list in Clay, Apollo, or a CSV
+  export. Run `revgate lint` to catch suppression collisions, DNC hits, restricted
+  jurisdictions, unrendered merge fields, stale enrichment, and other mistakes
+  that either bounce, land in spam, or create compliance exposure. One P0 finding
+  blocks the send; the exit code goes straight into CI or a pre-send gate.
+
+- **Before an ABM push.** You have a tight account list and want to verify every
+  row is the right company, the right size, and has fresh data. Use `revgate lint`
+  with a config tuned for enterprise (strict title filtering, tight headcount
+  range, fresh enrichment).
+
+- **When you diff two exports.** You refreshed a list and want to know what
+  changed and whether the new rows pass. `revgate diff` matches old against new by
+  domain, reports added/removed/changed, and re-gates only the rows that moved.
+
+- **Before shipping an AI sales agent.** You built an agent that answers replies,
+  handles inbound, or qualifies leads. Run `revgate redteam` to throw 27
+  adversarial scenarios at it — identity disclosure, unauthorized discounts,
+  fabricated compliance claims, prompt injection, opt-out violations — and see
+  which guardrails hold and which yield.
+
+- **When you want a multi-agent audit, not just a lint.** `revgate audit --judge
+  droid` decomposes the findings across parallel droid sessions, each reviewing a
+  rule group, then a root cause analysis session that sees patterns no individual
+  gate can see, then a synthesis session that cross-validates everything. This is
+  the step that pattern matching provably cannot do.
+
+- **As a CI gate.** Wire `revgate lint` into your pipeline so a bad list never
+  ships. The exit codes are the contract: 0 = clean, 2 = blocked. The bundled
+  pre-commit hook does the same thing at commit time.
+
+- **As an HTTP API for Clay/HubSpot/Apollo.** Run `revgate serve` and wire a
+  webhook column in Clay that sends each row to revgate before it reaches
+  outbound. The response carries writeback fields (`revgate_status`,
+  `revgate_severity`, `revgate_rules`) that map straight back into your tool's
+  columns. Filter on `revgate_status == PASS` and only clean rows proceed.
+
+**When NOT to use it:**
+
+- As a CRM or enrichment tool. It doesn't source data; it gates data you already
+  have.
+- As a sending platform. It doesn't send emails or make calls; it stops bad sends
+  from happening.
+- As legal advice. The compliance gates (DNC, calling hours, jurisdiction) are
+  operational safeguards based on common practice. Verify current requirements
+  with counsel.
+
+---
+
 **Prerequisites:** Python 3.11+ and a terminal. That's it for everything
 except the droid-powered features.
 
