@@ -166,7 +166,14 @@ class Dataset:
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"no such file: {p}")
-        with p.open(newline="", encoding="utf-8-sig") as fh:
+        try:
+            fh = p.open(newline="", encoding="utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                f"could not read {p} as UTF-8: {exc}. "
+                "Re-save the file as UTF-8 (Excel: File > Save As > 'CSV UTF-8')."
+            ) from exc
+        with fh:
             dialect = _sniff_dialect(fh, delimiter=delimiter)
             reader = csv.DictReader(fh, dialect=dialect)
             headers = [h for h in (reader.fieldnames or []) if h is not None]
@@ -254,7 +261,14 @@ def load_key_set(path: str | Path, kinds: tuple[str, ...] = ("domain", "email", 
     if not p.exists():
         raise FileNotFoundError(f"no such file: {p}")
     out: dict[str, set[str]] = {k: set() for k in kinds}
-    with p.open(newline="", encoding="utf-8-sig") as fh:
+    try:
+        fh = p.open(newline="", encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"could not read {p} as UTF-8: {exc}. "
+            "Re-save the file as UTF-8 (Excel: File > Save As > 'CSV UTF-8')."
+        ) from exc
+    with fh:
         dialect = _sniff_dialect(fh, delimiter=delimiter)
         reader = csv.DictReader(fh, dialect=dialect)
         headers = [h for h in (reader.fieldnames or []) if h]

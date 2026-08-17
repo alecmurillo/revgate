@@ -325,8 +325,10 @@ class CleanInputPerGate(unittest.TestCase):
          "Acme Corp,acme.com,bob@acme.com\n"),
         ("L011", "company,domain,email,headcount\n",
          "Acme,acme.com,bob@acme.com,50\n"),
-        ("L012", "company,domain,email,headcount\n",
-         "Acme,acme.com,bob@acme.com,50\n"),
+        # L012 needs 20+ rows with a distribution that includes
+        # companies below the headcount floor (default 5). A single
+        # row would skip, not pass. Covered by the built fixture below.
+        # ("L012", ...) — see test_l012_clean_distribution_passes
         ("L013", "company,domain,email\n",
          "Acme,acme.com,bob@acme.com\n"),
         ("L014", "company,domain,email,phone\n",
@@ -358,6 +360,16 @@ class CleanInputPerGate(unittest.TestCase):
                 tmp.close()
                 try:
                     result = runner.run(Path(tmp.name), config())
+                    skipped_rules = {s.rule for s in result.skipped}
+                    # A gate that silently skips instead of evaluating is not
+                    # the same as a gate that passes. This catches the case
+                    # where a clean row trips nothing because the gate never
+                    # ran, not because the input was clean.
+                    self.assertNotIn(
+                        rule_id, skipped_rules,
+                        f"{rule_id} skipped on input that should have been "
+                        f"evaluated: { {s.reason for s in result.skipped if s.rule == rule_id} }",
+                    )
                     findings = [f for f in result.findings if f.rule == rule_id]
                     self.assertEqual(
                         findings, [],
@@ -366,6 +378,26 @@ class CleanInputPerGate(unittest.TestCase):
                     )
                 finally:
                     Path(tmp.name).unlink()
+
+    def test_l012_clean_distribution_passes(self):
+        """L012 needs 20+ rows with a headcount distribution that includes
+        companies below the floor. A single row would skip, not pass."""
+        rows = []
+        for i in range(25):
+            hc = 3 if i == 0 else 50 + i * 10  # one small company, rest grow
+            rows.append(f"Co{i},co{i}.com,ops@co{i}.com,{hc}")
+        csv_text = "company,domain,email,headcount\n" + "\n".join(rows) + "\n"
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write(csv_text)
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            skipped_rules = {s.rule for s in result.skipped}
+            self.assertNotIn("L012", skipped_rules, "L012 should have run, not skipped")
+            l012 = [f for f in result.findings if f.rule == "L012"]
+            self.assertEqual(l012, [], "L012 should not fire when the floor is represented")
+        finally:
+            Path(tmp.name).unlink()
 
 
 if __name__ == "__main__":

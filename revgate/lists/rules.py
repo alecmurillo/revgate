@@ -33,6 +33,30 @@ from ..core.findings import Finding, Severity, Skipped
 
 P0, P1, P2 = Severity.P0, Severity.P1, Severity.P2
 
+# Dated compliance references. These are operational defaults, not legal
+# advice. Dollar figures and statutory details are kept here so they can
+# be updated in one place rather than scattered across origin strings.
+# Last reviewed: 2026-08-17. Verify with counsel before relying on these.
+COMPLIANCE_REFERENCES = {
+    "dnc_scrub_interval_days": 31,
+    "dnc_scrub_basis": (
+        "The FTC recommends scrubbing against the National DNC Registry at least "
+        "every 31 days. This is an operational default, not legal advice."
+    ),
+    "calling_hours_default": "8am-9pm local",
+    "calling_hours_ct": "9am-8pm local",
+    "calling_hours_basis": (
+        "Calling-hour windows are an operational safeguard, not legal advice. "
+        "The defaults reflect common practice but jurisdictions change and "
+        "this gate does not replace review by counsel."
+    ),
+    "restricted_jurisdiction_basis": (
+        "Some jurisdictions restrict unsolicited contact. This gate is an "
+        "operational safeguard, not legal advice — confirm with counsel."
+    ),
+    "disclaimer": "Not legal advice. Verify current requirements with counsel.",
+}
+
 
 @dataclass
 class Context:
@@ -355,10 +379,7 @@ def _check_jurisdiction(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]
                 title="Row sits in a restricted jurisdiction",
                 detail=f"state {raw or st} is on the restricted list",
                 remedy="Remove the row, or route it to a channel cleared for that jurisdiction.",
-                origin=(
-                    "Some jurisdictions restrict unsolicited contact. This gate is a "
-                    "operational safeguard, not legal advice — confirm with counsel."
-                ),
+                origin=COMPLIANCE_REFERENCES["restricted_jurisdiction_basis"],
                 row=n, key=ds.label(row), column=ds.column("state"),
             ))
     return out
@@ -935,11 +956,10 @@ def _check_dnc_staleness(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
             rule=rule, severity=P0,
             title="Do-not-call source is stale",
             detail=f"DNC source last scrubbed {age_days} days ago (limit: {max_days} days). A stale DNC list means numbers may have been added since the last scrub.",
-            remedy=f"Re-export and re-scrub the DNC list. Federal law requires scrubbing every 31 days; a list older than that is a compliance liability.",
+            remedy=f"Re-export and re-scrub the DNC list. {COMPLIANCE_REFERENCES['dnc_scrub_basis']}",
             origin=(
-                "Federal law requires scrubbing against the National DNC Registry at least every 31 days. "
                 "A DNC file that is 60 days old is not a DNC file — it is a historical document. "
-                "Calling a number added to the DNC list since the last scrub is a statutory violation."
+                f"{COMPLIANCE_REFERENCES['dnc_scrub_basis']}"
             ),
             row=None, key=str(ctx.dnc_path),
         )]
@@ -1053,11 +1073,7 @@ def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
                 title="Send time outside legal calling hours",
                 detail=f"send_time {raw} is outside legal hours ({start}:00-{end}:00{(' CT' if state == 'CT' else '')})",
                 remedy=f"Move the send time to within {start}:00-{end}:00 local time for this recipient's jurisdiction.",
-                origin=(
-                    "Calling-hour windows are an operational safeguard, not legal advice. "
-                    "The defaults reflect common practice (8 a.m.-9 p.m. local, 9 a.m.-8 p.m. CT) "
-                    "but jurisdictions change and this gate does not replace review by counsel."
-                ),
+                origin=COMPLIANCE_REFERENCES["calling_hours_basis"],
                 row=n, key=ds.label(row), column=ds.column("send_time"),
             ))
     if unparseable:
@@ -1203,7 +1219,7 @@ RULES: tuple[Rule, ...] = (
          "Remove, never flag.", _check_dnc),
     Rule("L004", "restricted-jurisdiction", P0,
          "Row sits in a jurisdiction this motion is not cleared for",
-         "Some jurisdictions restrict unsolicited contact; confirm with counsel.", _check_jurisdiction),
+         COMPLIANCE_REFERENCES["restricted_jurisdiction_basis"], _check_jurisdiction),
     Rule("L005", "missing-trigger", P0,
          "Row carries no specific, checkable reason for the outreach",
          "Empty personalisation is worse than none.", _check_trigger),
@@ -1244,7 +1260,7 @@ RULES: tuple[Rule, ...] = (
          "Title indicates the wrong seniority for the motion",
          "An intern cannot sign a contract.", _check_title_scope),
     Rule("L018", "dnc-source-staleness", P0,
-         "DNC source file is older than the legal scrubbing interval",
+         "DNC source file is older than the configured scrubbing interval",
          "A stale DNC list is a historical document, not a compliance tool.", _check_dnc_staleness),
     Rule("L019", "calling-hours", P0,
          "Send time falls outside legal calling hours for the recipient's jurisdiction",
