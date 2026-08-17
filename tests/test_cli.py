@@ -221,5 +221,38 @@ class AuditCommand(unittest.TestCase):
         self.assertIn("--max-workers", proc.stdout)
 
 
+class PipedExitCodes(unittest.TestCase):
+    """Every output-producing command must preserve its exit code when piped.
+
+    A closed pipe (head, tee, etc.) must not change the exit code. This is the
+    G4 regression class: BrokenPipeError must never downgrade or upgrade the
+    real verdict.
+    """
+
+    PIPED_CASES = [
+        (["lint", DIRTY, "--today", TODAY, "--no-record"], 2),
+        (["lint", CLEAN, "--today", TODAY, "--no-record"], 0),
+        (["diff", CLEAN, DIRTY, "--today", TODAY, "--no-record"], 2),
+        (["redteam", "--target", "demo", "--no-record"], 2),
+        (["audit", DIRTY, "--judge", "pattern", "--today", TODAY, "--no-record"], 2),
+        (["audit", CLEAN, "--judge", "pattern", "--today", TODAY, "--no-record"], 0),
+        (["audit", DIRTY, "--judge", "pattern", "--format", "json", "--today", TODAY, "--no-record"], 2),
+        (["rules"], 0),
+        (["scenarios"], 0),
+        (["provenance", "--no-record"], 0),
+    ]
+
+    def test_exit_code_survives_a_closed_pipe(self):
+        for argv, want in self.PIPED_CASES:
+            with self.subTest(cmd=argv[0], want=want):
+                p = subprocess.Popen(
+                    [sys.executable, "-m", "revgate", *argv],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=REPO,
+                )
+                subprocess.run(["head", "-2"], stdin=p.stdout, capture_output=True)
+                p.stdout.close()
+                self.assertEqual(p.wait(), want)
+
+
 if __name__ == "__main__":
     unittest.main()

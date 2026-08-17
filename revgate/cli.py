@@ -25,13 +25,21 @@ DEFAULT_BATTERY = Path(__file__).resolve().parent / "batteries" / "sales-intake.
 
 
 def _emit(text: str, out: str | None) -> None:
+    """Write output. A closed stdout pipe is swallowed here so it can never
+    change a caller's exit code — callers must compute their code first."""
     if out:
         path = Path(out)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
-        print(f"wrote {path}")
+        try:
+            print(f"wrote {path}")
+        except BrokenPipeError:
+            pass
     else:
-        print(text)
+        try:
+            print(text)
+        except BrokenPipeError:
+            pass
 
 
 def _finish(result: Result, cfg: Config, args: argparse.Namespace) -> int:
@@ -296,14 +304,20 @@ def cmd_audit(args: argparse.Namespace) -> int:
         print(f"revgate: {exc}", file=sys.stderr)
         return EXIT_USAGE
 
-    if args.format == "json":
-        print(render_audit_json(result, cfg.strict))
-    else:
-        print(render_audit_text(result, cfg.strict))
-
+    # Compute exit code BEFORE any output. The pipe can close during
+    # _emit (BrokenPipeError), and the exit code must already be decided.
+    code = result.exit_code
+    _emit(
+        render_audit_json(result, cfg.strict) if args.format == "json"
+        else render_audit_text(result, cfg.strict),
+        getattr(args, "out", None),
+    )
     if not args.no_record:
-        provenance_mod.record_run(cfg, result.lint_result)
-    return result.exit_code
+        try:
+            provenance_mod.record_run(cfg, result.lint_result)
+        except BrokenPipeError:
+            pass
+    return code
 
 
 # --------------------------------------------------------------------------
