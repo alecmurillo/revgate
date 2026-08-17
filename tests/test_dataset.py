@@ -61,17 +61,41 @@ class Emails(unittest.TestCase):
     def test_domain_of_a_non_email_is_empty(self):
         self.assertEqual(email_domain("jordan"), "")
 
+    def test_plus_addressing_is_stripped(self):
+        # G8: alice+spam@acme.com must match alice@acme.com in suppression
+        self.assertEqual(norm_email("alice+spam@acme.com"), "alice@acme.com")
+        self.assertEqual(norm_email("alice+anything+more@acme.com"), "alice@acme.com")
+
+    def test_domain_strips_port(self):
+        # G8: acme.com:8080 must match acme.com
+        self.assertEqual(norm_domain("acme.com:8080"), "acme.com")
+        self.assertEqual(norm_domain("https://acme.com:443/path"), "acme.com")
+
 
 class Phones(unittest.TestCase):
     def test_formatting_is_irrelevant(self):
         for raw in ("+1 (415) 555-0142", "1-415-555-0142", "415.555.0142", "4155550142"):
             self.assertEqual(norm_phone(raw), "4155550142", raw)
 
-    def test_short_numbers_are_left_alone_rather_than_padded(self):
-        self.assertEqual(norm_phone("555-0142"), "5550142")
+    def test_short_numbers_return_empty_not_partial(self):
+        # G1 fix: numbers that aren't 10 digits return empty string,
+        # not a partial match that could collide with a real number.
+        self.assertEqual(norm_phone("555-0142"), "")
 
-    def test_extensions_beyond_ten_digits_keep_the_last_ten(self):
-        self.assertEqual(len(norm_phone("+44 20 7946 0958 123")), 10)
+    def test_extensions_are_stripped_not_windowed(self):
+        # G1 fix: extensions are stripped before checking length,
+        # so the last-10-digits window can't slide past them.
+        self.assertEqual(norm_phone("4155550142 x22"), "4155550142")
+        self.assertEqual(norm_phone("4155550142 ext 4"), "4155550142")
+
+    def test_excel_float_coercion_is_handled(self):
+        # G1 fix: Excel may store phone numbers as floats (4155550142.0)
+        self.assertEqual(norm_phone("4155550142.0"), "4155550142")
+
+    def test_non_ten_digit_numbers_return_empty(self):
+        # International numbers that aren't 10 digits return empty
+        # rather than a misleading partial match.
+        self.assertEqual(norm_phone("+44 20 7946 0958"), "")
 
 
 class Integers(unittest.TestCase):

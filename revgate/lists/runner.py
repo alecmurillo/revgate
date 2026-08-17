@@ -24,6 +24,10 @@ def _load_sources(cfg: Config, ctx: Context) -> None:
             ctx.suppression = {"domain": set(), "email": set()}
             ctx.suppression_path = Path(cfg.suppression)
             ctx.suppression_missing = True
+        except OSError as exc:
+            ctx.suppression = {"domain": set(), "email": set()}
+            ctx.suppression_path = Path(cfg.suppression)
+            ctx.skip("L001", f"suppression source {cfg.suppression} is unreadable: {exc}", blocking=True)
 
     if cfg.dnc is not None:
         try:
@@ -33,6 +37,10 @@ def _load_sources(cfg: Config, ctx: Context) -> None:
             ctx.dnc = set()
             ctx.dnc_path = Path(cfg.dnc)
             ctx.dnc_missing = True
+        except OSError as exc:
+            ctx.dnc = set()
+            ctx.dnc_path = Path(cfg.dnc)
+            ctx.skip("L003", f"do-not-call source {cfg.dnc} is unreadable: {exc}", blocking=True)
 
 
 def select_rules(only: list[str] | None = None) -> list[Rule]:
@@ -60,10 +68,18 @@ def run(path: str | Path, cfg: Config, only: list[str] | None = None) -> Result:
 def run_on_dataset(
     ds: Dataset, cfg: Config, only: list[str] | None = None, *, target: str = "(in-memory)",
 ) -> Result:
-    ctx = Context()
+    ctx = Context(acknowledge_unconfigured=cfg.acknowledge_unconfigured)
     _load_sources(cfg, ctx)
 
     rules = select_rules(only)
+    # Filter out disabled rules.
+    disabled = set(cfg.disable) if cfg.disable else set()
+    if disabled:
+        rules = [r for r in rules if r.id not in disabled]
+        for rid in sorted(disabled):
+            if rid in RULES_BY_ID:
+                ctx.skip(rid, "rule disabled in config", blocking=False)
+
     result = Result(surface="lists", target=target)
 
     for rule in rules:

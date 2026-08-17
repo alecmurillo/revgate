@@ -130,6 +130,8 @@ class Recording(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "revgate.toml"
             config.write_text(
+                "[lint]\n"
+                'acknowledge_unconfigured = ["L001", "L003", "L018"]\n'
                 "[provenance]\n"
                 f'runs_dir = "{Path(tmp) / "runs"}"\n',
                 encoding="utf-8",

@@ -126,8 +126,16 @@ jobs:
           if [ -n "$FACTORY_API_KEY" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "FACTORY_API_KEY is not set; skipping the Droid review." >> "$GITHUB_STEP_SUMMARY"
+            # Fork PRs don't have access to secrets — skip cleanly.
+            # Same-repo PRs must have the key — fail loudly.
+            if [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "::error::FACTORY_API_KEY is not set for a same-repo PR. Add the secret or this job will fail." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            else
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "FACTORY_API_KEY is not set; skipping the Droid review (fork PR)." >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
 
       - name: Which files changed
@@ -306,7 +314,8 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "FACTORY_API_KEY is not set; skipping the Droid audit." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::FACTORY_API_KEY is not set. The droid audit cannot run without it." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       - name: Install the Droid CLI

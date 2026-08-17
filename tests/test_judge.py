@@ -102,10 +102,13 @@ class NothingToJudge(unittest.TestCase):
         j = PatternJudge().evaluate(s, ["it works well"])
         self.assertTrue(j.unjudged[0].blocking)
 
-    def test_an_unjudged_extra_assertion_does_not_block_when_patterns_ran(self):
+    def test_an_unjudged_extra_assertion_always_blocks_even_when_patterns_ran(self):
+        # G2 fix: an unevaluated semantic assertion is always blocking,
+        # even if pattern assertions ran and passed. An assertion nobody
+        # evaluated is never downgraded to a pass.
         s = scenario(semantic="tone check", must_not_match=pat("guarantee"))
         j = PatternJudge().evaluate(s, ["no promises here"])
-        self.assertFalse(j.unjudged[0].blocking)
+        self.assertTrue(j.unjudged[0].blocking)
 
 
 class DroidJudgeWithoutDroid(unittest.TestCase):

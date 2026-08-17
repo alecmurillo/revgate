@@ -335,6 +335,11 @@ def verify(cfg: Config) -> Result:
         "surfaces": len(by_surface),
     }
     result.notes.append("Surfaces claimed: " + ", ".join(f"{k} ×{v}" for k, v in sorted(by_surface.items())))
+    result.notes.append(
+        f"{result.stats['verified']}/{result.stats['claims']} claims verified present "
+        "against the files they name. 'Verified' means the file exists and carries "
+        "the expected fields — not that the surface has been exercised in a live run."
+    )
     return result
 
 

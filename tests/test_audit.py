@@ -27,7 +27,7 @@ FIXTURES = _REPO / "fixtures"
 
 class TestAuditPatternOnly(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = Config(acknowledge_unconfigured=("L001", "L003", "L018"))
 
     def test_dirty_list_blocked(self):
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
@@ -79,7 +79,7 @@ class TestAuditPatternOnly(unittest.TestCase):
 
 class TestAuditDroidUnavailable(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = Config(acknowledge_unconfigured=("L001", "L003", "L018"))
 
     def test_droid_not_available_fails_closed(self):
         with patch("revgate.audit.shutil.which", return_value=None):
@@ -119,12 +119,24 @@ class TestAuditDroidUnavailable(unittest.TestCase):
         self.assertIn("synthesis", parsed)
         self.assertEqual(parsed["synthesis"]["overall"], "unjudged")
 
+    def test_exit_code_blocks_when_unjudged(self):
+        # F1: audit must exit 2 when agent reviews are unjudged, not 0
+        with patch("revgate.audit.shutil.which", return_value=None):
+            result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        self.assertEqual(result.exit_code, 2, "unjudged reviews must block, not pass")
+
+    def test_pattern_only_has_skipped_milestones(self):
+        # F5: pattern-only mode must show skipped milestones for phases 2-4
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
+        skipped = [m for m in result.milestones if m.status == "skipped"]
+        self.assertGreaterEqual(len(skipped), 4, "phases 2-4 should be skipped in pattern-only mode")
+
 
 class TestAuditMockedDroid(unittest.TestCase):
     """Test with mocked droid exec that returns confirmed verdicts."""
 
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = Config(acknowledge_unconfigured=("L001", "L003", "L018"))
 
     @staticmethod
     def _mock_droid_response(*args, **kwargs):

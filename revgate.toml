@@ -37,6 +37,9 @@ suppression = "fixtures/crm-export.csv"
 # a blocking failure, not an empty pass.
 dnc = "fixtures/dnc.csv"
 
+# Declared DNC export date — replaces unreliable file mtime for staleness checks.
+dnc_exported = "2026-08-01"
+
 # Map logical fields onto your own headers when they are not auto-detected.
 # [lint.columns]
 # trigger = "why_now"

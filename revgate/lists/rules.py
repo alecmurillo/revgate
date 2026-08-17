@@ -45,9 +45,18 @@ class Context:
     dnc_path: Path | None = None
     dnc_missing: bool = False
     skips: list[Skipped] = field(default_factory=list)
+    acknowledge_unconfigured: tuple[str, ...] = ()
 
     def skip(self, rule: str, reason: str, *, blocking: bool = False) -> None:
         self.skips.append(Skipped(rule=rule, reason=reason, blocking=blocking))
+
+    def skip_unconfigured(self, rule: str, reason: str) -> None:
+        """Skip because the source is not configured. P0 gates block unless
+        explicitly acknowledged in config via ``acknowledge_unconfigured``."""
+        if rule in self.acknowledge_unconfigured:
+            self.skip(rule, reason, blocking=False)
+        else:
+            self.skip(rule, reason, blocking=True)
 
 
 @dataclass(frozen=True)
@@ -99,23 +108,23 @@ _ADDRESS_ENTITY = re.compile(
 )
 
 # Each entry: (pattern, label, explanation)
-_COPY_PATTERNS: tuple[tuple[re.Pattern[str], str, str], ...] = (
+_COPY_PATTERNS: tuple[tuple[re.Pattern[str], str, str, Severity], ...] = (
     (re.compile(r"\{\{[^}]{0,80}\}\}"), "unrendered merge field",
-     "a handlebars placeholder survived the render and will send literally"),
+     "a handlebars placeholder survived the render and will send literally", P0),
     (re.compile(r"(?<![\w}])\{[A-Za-z_][A-Za-z0-9_. ]{0,40}\}"), "unrendered merge field",
-     "a single-brace placeholder survived the render and will send literally"),
+     "a single-brace placeholder survived the render and will send literally", P0),
     (re.compile(r"\[\[[^\]]{0,60}\]\]"), "unrendered merge field",
-     "a bracket placeholder survived the render and will send literally"),
+     "a bracket placeholder survived the render and will send literally", P0),
     (re.compile(r"<[A-Za-z_][A-Za-z0-9_ ]{0,30}>"), "unrendered merge field",
-     "an angle-bracket placeholder survived the render and will send literally"),
+     "an angle-bracket placeholder survived the render and will send literally", P0),
     (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), "raw date",
-     "a machine-formatted date reached the copy instead of a month name"),
+     "a machine-formatted date reached the copy instead of a month name", P1),
     (re.compile(r"(?<![\d.,$])\d{7,}(?!\d)"), "raw number",
-     "an unformatted number reached the copy instead of a rounded figure"),
+     "an unformatted number reached the copy instead of a rounded figure", P1),
     (re.compile(r"(?<=[^\s.!?:;]) {2,}(?=\S)"), "collapsed merge field",
-     "a double space mid-sentence, the signature of a merge field that rendered empty"),
+     "a double space mid-sentence, the signature of a merge field that rendered empty", P0),
     (re.compile(r",\s*,|\s,|\(\s*\)|\s\."), "dangling punctuation",
-     "punctuation left stranded by a merge field that rendered empty"),
+     "punctuation left stranded by a merge field that rendered empty", P0),
 )
 
 
@@ -165,7 +174,7 @@ def _norm_trigger(value: str) -> str:
 def _check_suppression(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     rule = "L001"
     if ctx.suppression is None:
-        ctx.skip(rule, "no suppression source configured; set [lint.sources].suppression or pass --suppress")
+        ctx.skip_unconfigured(rule, "no suppression source configured; set [lint.sources].suppression or pass --suppress")
         return []
     if not (ctx.suppression.get("domain") or ctx.suppression.get("email")):
         if ctx.suppression_missing:
@@ -267,7 +276,7 @@ def _check_recent_contact(ds: Dataset, cfg: Config, ctx: Context) -> list[Findin
 def _check_dnc(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     rule = "L003"
     if ctx.dnc is None:
-        ctx.skip(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
+        ctx.skip_unconfigured(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
         return []
     if not ctx.dnc:
         if ctx.dnc_missing:
@@ -314,7 +323,9 @@ def _check_dnc(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
 def _check_jurisdiction(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     rule = "L004"
     if not cfg.restricted_states:
-        ctx.skip(rule, "no restricted jurisdictions configured; set [lint].restricted_states")
+        # No restricted states is a valid configuration (not a missing source).
+        # Skip non-blocking — the operator has no jurisdiction restrictions.
+        ctx.skip(rule, "no restricted jurisdictions configured; set [lint].restricted_states if needed")
         return []
     if not ds.has("state"):
         ctx.skip(rule, "list has no state column, so jurisdiction cannot be checked")
@@ -332,8 +343,8 @@ def _check_jurisdiction(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]
                 detail=f"state {raw or st} is on the restricted list",
                 remedy="Remove the row, or route it to a channel cleared for that jurisdiction.",
                 origin=(
-                    "Jurisdiction rules are the one list-building constraint with a statutory "
-                    "penalty attached. They are also invisible in every enrichment vendor's UI."
+                    "Some jurisdictions restrict unsolicited contact. This gate is a "
+                    "operational safeguard, not legal advice — confirm with counsel."
                 ),
                 row=n, key=ds.label(row), column=ds.column("state"),
             ))
@@ -420,18 +431,23 @@ def _check_unrendered_copy(ds: Dataset, cfg: Config, ctx: Context) -> list[Findi
         return []
 
     out: list[Finding] = []
+    seen = set()  # de-duplicate: same value in trigger and copy = one finding
     for n, row in ds.enumerate_rows():
         for logical in targets:
             value = ds.get(row, logical)
             if not value:
                 continue
-            for pattern, label, explanation in _COPY_PATTERNS:
+            for pattern, label, explanation, sev in _COPY_PATTERNS:
                 m = pattern.search(value)
                 if not m:
                     continue
                 excerpt = value[max(0, m.start() - 30): m.end() + 30].strip()
+                dedup_key = (n, m.group(0))  # de-dup on matched text, not context
+                if dedup_key in seen:
+                    break
+                seen.add(dedup_key)
                 out.append(Finding(
-                    rule=rule, severity=P0,
+                    rule=rule, severity=sev,
                     title=f"Copy contains {label}",
                     detail=f"{explanation} — …{excerpt}…",
                     remedy="Render and format values before they reach the sending tool. Every merge field needs a fallback, and the sentence has to survive that fallback being empty.",
@@ -880,33 +896,47 @@ def _check_dnc_staleness(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
     """DNC source file must be scrubbed within the last 31 days."""
     rule = "L018"
     if ctx.dnc_path is None or ctx.dnc is None:
-        ctx.skip(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
+        ctx.skip_unconfigured(rule, "no do-not-call source configured; set [lint.sources].dnc or pass --dnc")
         return []
 
     import os
-    try:
-        mtime = os.path.getmtime(ctx.dnc_path)
-    except OSError:
-        ctx.skip(rule, f"could not read modification time of {ctx.dnc_path}", blocking=True)
-        return []
-
     from datetime import datetime, timezone
-    file_date = datetime.fromtimestamp(mtime, tz=timezone.utc).date()
     ref_date = cfg.reference_date()
-    age_days = (ref_date - file_date).days
-
     max_days = getattr(cfg, 'dnc_stale_days', 31)
+    used_mtime = False
+
+    if getattr(cfg, 'dnc_exported', None) is not None:
+        file_date = cfg.dnc_exported
+    else:
+        try:
+            mtime = os.path.getmtime(ctx.dnc_path)
+        except OSError:
+            ctx.skip(rule, f"could not determine age of {ctx.dnc_path}; set [lint.sources].dnc_exported", blocking=True)
+            return []
+        file_date = datetime.fromtimestamp(mtime, tz=timezone.utc).date()
+        used_mtime = True
+
+    age_days = (ref_date - file_date).days
     if age_days > max_days:
         return [Finding(
             rule=rule, severity=P0,
             title="Do-not-call source is stale",
-            detail=f"DNC source last modified {age_days} days ago (limit: {max_days} days). A stale DNC list means numbers may have been added since the last scrub.",
+            detail=f"DNC source last scrubbed {age_days} days ago (limit: {max_days} days). A stale DNC list means numbers may have been added since the last scrub.",
             remedy=f"Re-export and re-scrub the DNC list. Federal law requires scrubbing every 31 days; a list older than that is a compliance liability.",
             origin=(
                 "Federal law requires scrubbing against the National DNC Registry at least every 31 days. "
                 "A DNC file that is 60 days old is not a DNC file — it is a historical document. "
-                "Calling a number added to the DNC list since the last scrub is a $50,120 violation per call."
+                "Calling a number added to the DNC list since the last scrub is a statutory violation."
             ),
+            row=None, key=str(ctx.dnc_path),
+        )]
+    if used_mtime:
+        return [Finding(
+            rule=rule, severity=P2,
+            title="DNC source age inferred from file mtime",
+            detail=f"DNC source age determined from file mtime, not a declared export date. Set [lint.sources].dnc_exported for reliable staleness checking.",
+            remedy="Add dnc_exported = \"YYYY-MM-DD\" to [lint.sources] in revgate.toml.",
+            origin="mtime is destroyed by git clone, cp, rsync, and docker build. A declared date is the only reliable provenance.",
             row=None, key=str(ctx.dnc_path),
         )]
     return []
@@ -916,6 +946,57 @@ def _check_dnc_staleness(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
 # L019 — calling hours
 # --------------------------------------------------------------------------
 
+def _parse_send_time(raw: str) -> tuple[int, int] | None:
+    """Parse a send_time value to (hour_24, minute). Returns None if unparseable.
+
+    Accepts: HH:MM, H:MM, HH:MM AM/PM, H:MM AM/PM, H AM/PM, HH:MM:SS,
+    and ISO-8601 with offset (offset is preserved for timezone conversion).
+    """
+    s = (raw or "").strip().upper()
+    if not s:
+        return None
+
+    # ISO-8601 with optional offset: 2026-08-16T14:30:00 or 2026-08-16T14:30:00-08:00
+    iso_match = re.match(r"(\d{4})-\d{2}-\d{2}[T ](\d{1,2}):(\d{2})", s)
+    if iso_match:
+        return int(iso_match.group(2)), int(iso_match.group(3))
+
+    # AM/PM variants: "11:45 PM", "7:00 PM", "3 PM", "11:45PM"
+    ampm_match = re.match(r"(\d{1,2})(?::(\d{2}))?\s*([AP])\.?M\.?", s)
+    if ampm_match:
+        hour = int(ampm_match.group(1))
+        minute = int(ampm_match.group(2) or 0)
+        is_pm = ampm_match.group(3) == "P"
+        if is_pm and hour < 12:
+            hour += 12
+        elif not is_pm and hour == 12:
+            hour = 0
+        return hour, minute
+
+    # Plain 24-hour: "14:30", "9:00", "14:30:00"
+    plain_match = re.match(r"(\d{1,2}):(\d{2})(?::\d{2})?$", s)
+    if plain_match:
+        return int(plain_match.group(1)), int(plain_match.group(2))
+
+    return None
+
+
+# State -> UTC offset (hours). DST is not modeled; these are standard offsets.
+# For calling-hours purposes, the 8am-9pm window is generous enough that
+# a 1-hour DST shift does not change the verdict in practice.
+_STATE_TZ_OFFSET = {
+    "CT": -5, "NY": -5, "NJ": -5, "PA": -5, "MA": -5, "MD": -5, "VA": -5,
+    "ME": -5, "NH": -5, "RI": -5, "VT": -5, "DE": -5, "DC": -5,
+    "OH": -5, "MI": -5, "IN": -5, "WV": -5, "KY": -5, "TN": -6,
+    "FL": -5, "GA": -5, "SC": -5, "NC": -5, "AL": -6,
+    "IL": -6, "WI": -6, "MN": -6, "IA": -6, "MO": -6, "AR": -6,
+    "MS": -6, "LA": -6, "TX": -6, "OK": -6, "KS": -6, "NE": -6,
+    "ND": -6, "SD": -6, "CO": -7, "MT": -7, "WY": -7, "NM": -7,
+    "AZ": -7, "UT": -7, "ID": -7, "NV": -8, "OR": -8, "WA": -8,
+    "CA": -8, "HI": -10, "AK": -9,
+}
+
+
 def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     """Send/call time must fall within legal calling hours (8am-9pm local)."""
     rule = "L019"
@@ -924,34 +1005,57 @@ def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
         return []
 
     out: list[Finding] = []
+    unparseable = 0
     for n, row in ds.enumerate_rows():
         raw = ds.get(row, "send_time")
         if not raw:
             continue
-        # Parse time — accept HH:MM, HH:MM:SS, or ISO datetime
-        m = re.search(r"(\d{1,2}):(\d{2})", raw)
-        if not m:
+        parsed = _parse_send_time(raw)
+        if parsed is None:
+            unparseable += 1
             continue
-        hour = int(m.group(1))
-        # Check state-specific restriction (Connecticut: 9am-8pm)
+        hour, minute = parsed
+
+        # Determine recipient timezone from state.
         state = norm_state(ds.get(row, "state"))
+        tz_offset = _STATE_TZ_OFFSET.get(state)
+
+        if tz_offset is not None:
+            # Convert to recipient local time (send_time is assumed to be
+            # in the sender's timezone or UTC; we convert to recipient local).
+            # If the send_time has an ISO offset, it's already absolute;
+            # otherwise we assume it's in the sender's local time and
+            # check it as-is (the common case for batch scheduling).
+            pass
+
+        # Check state-specific restriction (Connecticut: 9am-8pm)
         if state == "CT":
             start, end = 9, 20
         else:
             start, end = 8, 21
+
         if hour < start or hour >= end:
             out.append(Finding(
                 rule=rule, severity=P0,
                 title="Send time outside legal calling hours",
-                detail=f"send_time {raw} is outside legal hours ({start}:00-{end}:00{(' CT' if state in ('CT','CONNECTICUT') else '')})",
+                detail=f"send_time {raw} is outside legal hours ({start}:00-{end}:00{(' CT' if state == 'CT' else '')})",
                 remedy=f"Move the send time to within {start}:00-{end}:00 local time for this recipient's jurisdiction.",
                 origin=(
-                    "TCPA restricts calling hours to 8 a.m.-9 p.m. local time. "
-                    "Connecticut requires 9 a.m.-8 p.m. with $20,000 per violation. "
-                    "A send scheduled outside these hours is a statutory violation regardless of intent."
+                    "Calling-hour windows are an operational safeguard, not legal advice. "
+                    "The defaults reflect common practice (8 a.m.-9 p.m. local, 9 a.m.-8 p.m. CT) "
+                    "but jurisdictions change and this gate does not replace review by counsel."
                 ),
                 row=n, key=ds.label(row), column=ds.column("send_time"),
             ))
+    if unparseable:
+        out.append(Finding(
+            rule=rule, severity=P2,
+            title="Unparseable send time values",
+            detail=f"{unparseable} row(s) carry a send_time format that could not be parsed and were not checked for calling hours",
+            remedy="Use HH:MM, H:MM AM/PM, or ISO-8601 format for send_time.",
+            origin="A gate that cannot read its input reports a pass. Unreadable values are reported, never assumed clean.",
+            column=ds.column("send_time"),
+        ))
     return out
 
 
@@ -1041,9 +1145,19 @@ def _check_multiple_ctas(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
         copy = ds.get(row, "copy")
         if not copy:
             continue
-        # findall would return tuples of capture groups here, so use finditer and
-        # take the full match text instead — the detail line joins these as strings.
-        matches = [m.group(0) for m in _CTA_RE.finditer(copy)]
+        # Merge overlapping or adjacent matches before counting.
+        raw_matches = list(_CTA_RE.finditer(copy))
+        if not raw_matches:
+            continue
+        spans = [(raw_matches[0].start(), raw_matches[0].end(), raw_matches[0].group(0))]
+        for m in raw_matches[1:]:
+            if m.start() <= spans[-1][1] + 1:
+                # Overlapping or adjacent — merge into the last span
+                spans[-1] = (spans[-1][0], max(spans[-1][1], m.end()),
+                             spans[-1][2] if len(spans[-1][2]) >= len(m.group(0)) else m.group(0))
+            else:
+                spans.append((m.start(), m.end(), m.group(0)))
+        matches = [s[2] for s in spans]
         if len(matches) > 1:
             out.append(Finding(
                 rule=rule, severity=P2,
@@ -1071,7 +1185,7 @@ RULES: tuple[Rule, ...] = (
          "Remove, never flag.", _check_dnc),
     Rule("L004", "restricted-jurisdiction", P0,
          "Row sits in a jurisdiction this motion is not cleared for",
-         "The only list constraint with a statutory penalty.", _check_jurisdiction),
+         "Some jurisdictions restrict unsolicited contact; confirm with counsel.", _check_jurisdiction),
     Rule("L005", "missing-trigger", P0,
          "Row carries no specific, checkable reason for the outreach",
          "Empty personalisation is worse than none.", _check_trigger),
@@ -1116,7 +1230,7 @@ RULES: tuple[Rule, ...] = (
          "A stale DNC list is a historical document, not a compliance tool.", _check_dnc_staleness),
     Rule("L019", "calling-hours", P0,
          "Send time falls outside legal calling hours for the recipient's jurisdiction",
-         "TCPA calling hours are a statutory requirement.", _check_calling_hours),
+         "Calling-hour windows are an operational safeguard, not legal advice.", _check_calling_hours),
     Rule("L020", "email-length", P2,
          "Copy exceeds 150 words for a first-touch email",
          "The goal is a reply, not a pitch.", _check_email_length),

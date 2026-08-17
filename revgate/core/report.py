@@ -99,7 +99,7 @@ def render_text(result: Result, strict: bool = False, stream: Any = None) -> str
 
     advisory_skips = [s for s in result.skipped if not s.blocking]
     if advisory_skips:
-        lines.append(_paint("  not checked (no such field in this file)", "dim", color))
+        lines.append(_paint("  not checked (no matching column, source, or rule disabled)", "dim", color))
         for s in advisory_skips:
             lines.append(_paint(f"    - {s.rule}: {s.reason}", "dim", color))
         lines.append("")
@@ -166,7 +166,7 @@ def render_markdown(result: Result, strict: bool = False) -> str:
 
     advisory = [s for s in result.skipped if not s.blocking]
     if advisory:
-        out.append("### Not checked")
+        out.append("### Not checked (no matching column, source, or rule disabled)")
         out.append("")
         for s in advisory:
             out.append(f"- {s.rule} — {s.reason}")
@@ -206,6 +206,8 @@ def render_html(result: Result, strict: bool = False) -> str:
         summary = f"This list cannot be sent as-is. {counts['P0']} blocking issue{'s' if counts['P0'] != 1 else ''} must be fixed first."
     elif verdict == "ADVISORY":
         summary = f"This list can be sent, but {counts['P1'] + counts['P2']} row{'s' if counts['P1'] + counts['P2'] != 1 else ''} have issues worth reviewing."
+    elif result.skipped:
+        summary = f"This list has no findings, but {len(result.skipped)} gate{'s' if len(result.skipped) != 1 else ''} could not be evaluated. See 'Not checked' below."
     else:
         summary = "This list passed all gates. No action needed."
 
@@ -364,7 +366,7 @@ def render_html(result: Result, strict: bool = False) -> str:
     # Advisory skips
     advisory = [s for s in result.skipped if not s.blocking]
     if advisory:
-        parts.append('<h2>Not checked (no matching column)</h2>')
+        parts.append('<h2>Not checked (no matching column, source, or rule disabled)</h2>')
         for s in advisory:
             parts.append(f'<div class="advisory-skip"><strong>{esc(s.rule)}</strong> — {esc(s.reason)}</div>')
 

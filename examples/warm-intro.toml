@@ -29,3 +29,11 @@ headcount_exclude_above = 50000
 
 # Warm-intro leads may have been contacted more recently.
 recent_contact_days = 7
+
+# Suppression sources — replace these paths with your real data files.
+# The defaults below point at the bundled fixtures so the config runs out
+# of the box. REMOVE THESE and point at your own exports before production.
+[lint.sources]
+suppression = "../fixtures/crm-export.csv"
+dnc = "../fixtures/dnc.csv"
+dnc_exported = "2026-08-01"

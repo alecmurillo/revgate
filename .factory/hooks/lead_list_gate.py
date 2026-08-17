@@ -84,17 +84,22 @@ def _project_dir(payload: dict) -> Path:
     return Path.cwd()
 
 
-def _staged_csvs(root: Path) -> list[str]:
+def _staged_csvs(root: Path) -> tuple[list[str], str | None]:
+    """Return (staged CSVs, error_message).
+
+    On enumeration failure, returns ([], error_message) so the caller can
+    block rather than silently allowing the commit through.
+    """
     try:
         proc = subprocess.run(
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
             cwd=root, capture_output=True, text=True, timeout=20, check=False,
         )
-    except (OSError, subprocess.SubprocessError):
-        return []
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [], f"git enumeration failed: {exc}"
     if proc.returncode != 0:
-        return []
-    return [line.strip() for line in proc.stdout.splitlines() if _is_lead_list(line.strip())]
+        return [], f"git diff exited {proc.returncode}: {proc.stderr.strip()}"
+    return [line.strip() for line in proc.stdout.splitlines() if _is_lead_list(line.strip())], None
 
 
 def _lint(root: Path, relative: str) -> tuple[int, str]:
@@ -175,7 +180,12 @@ def main() -> int:
         command = str(tool_input.get("command", ""))
         if "git commit" not in command:
             return CLEAN_EXIT
-        staged = _staged_csvs(root)
+        staged, enum_err = _staged_csvs(root)
+        if enum_err:
+            print(f"lead_list_gate: could not enumerate staged files: {enum_err}", file=sys.stderr)
+            if _fail_open():
+                return CLEAN_EXIT
+            return BLOCKED_EXIT
         if not staged:
             return CLEAN_EXIT
         return _gate(

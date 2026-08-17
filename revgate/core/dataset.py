@@ -47,6 +47,9 @@ def norm_domain(value: str) -> str:
     Suppression matching on a raw column is the single most common way a list
     passes a clean check and still collides: `https://WWW.Acme.com/pricing` and
     `acme.com` are the same company and no string comparison says so.
+
+    Strips ports (``acme.com:8080``), collapses ``www.`` prefixes, and strips
+    trailing dots so the same host in different forms matches.
     """
     v = (value or "").strip().lower()
     if not v:
@@ -54,13 +57,28 @@ def norm_domain(value: str) -> str:
     v = re.sub(r"^[a-z][a-z0-9+.-]*://", "", v)
     v = v.split("/")[0].split("?")[0].split("#")[0]
     v = v.split("@")[-1]
+    # Strip port
+    v = v.split(":")[0]
     if v.startswith("www."):
         v = v[4:]
     return v.strip().strip(".")
 
 
 def norm_email(value: str) -> str:
-    return (value or "").strip().lower()
+    """Normalise an email for comparison.
+
+    Strips plus-addressing (``alice+spam@acme.com`` → ``alice@acme.com``) so
+    the same person with a tagged alias still matches a suppression entry.
+    """
+    v = (value or "").strip().lower()
+    if not v:
+        return ""
+    if "@" in v:
+        local, _, domain = v.partition("@")
+        # Strip plus-addressing: alice+anything@acme.com → alice@acme.com
+        local = local.split("+")[0]
+        return f"{local}@{domain}"
+    return v
 
 
 def email_domain(value: str) -> str:
@@ -68,16 +86,28 @@ def email_domain(value: str) -> str:
     return norm_domain(e.split("@")[-1]) if "@" in e else ""
 
 
+_EXT_RE = re.compile(
+    r"\s*(?:x|ext\.?|extension|#)\s*\d+\s*$",
+    re.IGNORECASE,
+)
+
+
 def norm_phone(value: str) -> str:
-    """Digits only, North-America-normalised to the last 10.
+    """Digits only, North-America-normalised to 10 digits.
 
     A do-not-call list stored as `(415) 555-0142` and a lead stored as
     `+1 415 555 0142` must collide, or the gate is decorative.
+
+    Extensions (``x22``, ``ext 4``) and Excel float coercion (``8005550101.0``)
+    are stripped before digit extraction. Returns ``""`` if the result is not
+    exactly 10 digits, so callers can distinguish "unparseable" from "empty."
     """
-    digits = re.sub(r"\D", "", value or "")
+    s = _EXT_RE.sub("", (value or "").strip())
+    s = re.sub(r"\.0+$", "", s)  # Excel float coercion
+    digits = re.sub(r"\D", "", s)
     if len(digits) == 11 and digits.startswith("1"):
         digits = digits[1:]
-    return digits[-10:] if len(digits) >= 10 else digits
+    return digits if len(digits) == 10 else ""
 
 
 def parse_int(value: str) -> int | None:

@@ -21,6 +21,7 @@ Design decisions:
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sys
@@ -76,8 +77,11 @@ def _summary_from_findings(findings: list, skipped: list) -> str:
     for rule, items in sorted(grouped.items(), key=lambda kv: (list(Severity).index(kv[1][0].severity), kv[0])):
         parts.append(f"{rule}: {items[0].title} ({len(items)})")
     blocking_skips = [s for s in skipped if s.blocking]
+    non_blocking_skips = [s for s in skipped if not s.blocking]
     if blocking_skips:
         parts.append(f"blocking skips: {', '.join(s.rule for s in blocking_skips)}")
+    if non_blocking_skips:
+        parts.append(f"unevaluated: {', '.join(s.rule for s in non_blocking_skips)}")
     return "; ".join(parts) if parts else "All gates passed."
 
 
@@ -249,7 +253,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not expected:
             return True
         provided = self.headers.get("X-Revgate-Key", "")
-        return provided == expected
+        return hmac.compare_digest(provided, expected)
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/v1/health":
@@ -271,7 +275,36 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "not found", "hint": "use POST /v1/lint"})
             return
 
-        content_length = int(self.headers.get("Content-Length", 0))
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            self._send_json(400, {
+                "version": API_VERSION,
+                "verdict": "BLOCKED",
+                "exit_code": 2,
+                "error": "malformed Content-Length header",
+                "checked_at": _now_iso(),
+                "rows": [],
+                "counts": {"P0": 0, "P1": 0, "P2": 0},
+                "skipped": [],
+                "stats": {},
+                "notes": ["Content-Length header is not a valid integer."],
+            })
+            return
+        if content_length > 1_048_576:  # 1 MB cap
+            self._send_json(413, {
+                "version": API_VERSION,
+                "verdict": "BLOCKED",
+                "exit_code": 2,
+                "error": f"request body exceeds 1 MB limit ({content_length} bytes)",
+                "checked_at": _now_iso(),
+                "rows": [],
+                "counts": {"P0": 0, "P1": 0, "P2": 0},
+                "skipped": [],
+                "stats": {},
+                "notes": ["Request body too large. Cap at 1 MB."],
+            })
+            return
         raw = self.rfile.read(content_length) if content_length else b""
 
         try:
@@ -325,18 +358,24 @@ def create_server(
     *,
     auth_key: str | None = None,
     config: Config | None = None,
+    host: str = "127.0.0.1",
 ) -> HTTPServer:
     """Create an HTTPServer instance (for testing or programmatic use)."""
-    server = HTTPServer(("0.0.0.0", port), _Handler)
+    if host not in ("127.0.0.1", "localhost", "::1") and not (auth_key or os.environ.get("REVGATE_API_KEY")):
+        raise ValueError(
+            f"refusing to bind {host} without an auth key; "
+            "set --key or $REVGATE_API_KEY, or use --host 127.0.0.1"
+        )
+    server = HTTPServer((host, port), _Handler)
     server.auth_key = auth_key or ""  # type: ignore[attr-defined]
     server.base_config = config or Config.load()  # type: ignore[attr-defined]
     return server
 
 
-def serve(port: int = 8000, *, auth_key: str | None = None, config: Config | None = None) -> None:
+def serve(port: int = 8000, *, auth_key: str | None = None, config: Config | None = None, host: str = "127.0.0.1") -> None:
     """Start the blocking HTTP server."""
-    server = create_server(port, auth_key=auth_key, config=config)
-    print(f"revgate serve on http://0.0.0.0:{port}", file=sys.stderr)
+    server = create_server(port, auth_key=auth_key, config=config, host=host)
+    print(f"revgate serve on http://{host}:{port}", file=sys.stderr)
     if auth_key:
         print("  auth: X-Revgate-Key required", file=sys.stderr)
     else:

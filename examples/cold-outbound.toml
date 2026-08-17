@@ -34,7 +34,10 @@ headcount_exclude_above = 5000
 # Rows contacted inside this window are held, whatever the CRM stage says.
 recent_contact_days = 14
 
-# Suppression sources — files of accounts and phone numbers to exclude.
-# [lint.sources]
-# suppression = "data/accounts-in-play.csv"
-# dnc = "data/dnc-list.csv"
+# Suppression sources — replace these paths with your real data files.
+# The defaults below point at the bundled fixtures so the config runs out
+# of the box. REMOVE THESE and point at your own exports before production.
+[lint.sources]
+suppression = "../fixtures/crm-export.csv"
+dnc = "../fixtures/dnc.csv"
+dnc_exported = "2026-08-01"  # declared export date — replaces unreliable mtime

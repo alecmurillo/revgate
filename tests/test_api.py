@@ -160,7 +160,9 @@ class TestAdapters(unittest.TestCase):
 
 class TestEvaluate(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()  # zero-dependency default config
+        # Acknowledge that source-dependent P0 gates (suppression, DNC) are
+        # intentionally not configured for these logic tests.
+        self.cfg = Config(acknowledge_unconfigured=("L001", "L003", "L018"))
 
     def _load_fixture(self, name: str) -> dict:
         with (FIXTURES / name).open() as fh:
@@ -274,7 +276,8 @@ class TestEvaluate(unittest.TestCase):
 class TestHTTPServer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = create_server(port=0, auth_key="test-secret", config=Config())
+        cls.server = create_server(port=0, auth_key="test-secret",
+                                   config=Config(acknowledge_unconfigured=("L001", "L003", "L018")))
         # Port 0 lets the OS assign an ephemeral port.
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -350,6 +353,38 @@ class TestHTTPServer(unittest.TestCase):
     def test_404(self):
         status, body = self._request("GET", "/unknown")
         self.assertEqual(status, 404)
+
+    def test_malformed_content_length(self):
+        # H7: malformed Content-Length must not crash
+        status, body = self._request("POST", "/v1/lint", b"{}",
+                                     {"X-Revgate-Key": "test-secret", "Content-Length": "abc"})
+        self.assertEqual(status, 400)
+        self.assertEqual(body["verdict"], "BLOCKED")
+
+    def test_oversized_body_rejected(self):
+        # H7: body over 1MB must be rejected with 413.
+        # The server sends 413 and closes before reading the body, so the
+        # client may get a BrokenPipeError — that's expected.
+        big = json.dumps({"source": "generic", "rows": [{"Company": "X" * 1_100_000}]})
+        try:
+            status, body = self._request("POST", "/v1/lint", big.encode(),
+                                         {"X-Revgate-Key": "test-secret"})
+        except (ConnectionError, BrokenPipeError, OSError):
+            return  # server closed the connection after 413 — expected
+        self.assertEqual(status, 413)
+        self.assertEqual(body["verdict"], "BLOCKED")
+
+
+class ServerSecurity(unittest.TestCase):
+    def test_refuses_non_loopback_without_auth(self):
+        # H6: binding 0.0.0.0 without an auth key must raise
+        with self.assertRaises(ValueError):
+            create_server(port=0, host="0.0.0.0")
+
+    def test_allows_non_loopback_with_auth(self):
+        # H6: binding 0.0.0.0 with an auth key is allowed
+        s = create_server(port=0, host="0.0.0.0", auth_key="secret")
+        s.server_close()
 
 
 if __name__ == "__main__":

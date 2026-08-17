@@ -34,6 +34,11 @@ def _emit(text: str, out: str | None) -> None:
 
 
 def _finish(result: Result, cfg: Config, args: argparse.Namespace) -> int:
+    # Include the config path in the output so the reader can see which
+    # config was used (G6). Falls back to "default" if no config file was found.
+    config_path = getattr(cfg, "source_path", None)
+    if config_path:
+        result.notes.append(f"config: {config_path}")
     _emit(render(result, args.format, cfg.strict), getattr(args, "out", None))
     if not getattr(args, "no_record", False):
         provenance_mod.record_run(cfg, result)
@@ -380,10 +385,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import signal
+    try:
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (AttributeError, ValueError):
+        pass
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
+    except BrokenPipeError:
+        try:
+            sys.stdout.close()
+        except Exception:
+            pass
+        return 2  # preserve blocked verdict as default
     except KeyboardInterrupt:
         print("\nrevgate: interrupted", file=sys.stderr)
         return EXIT_USAGE
@@ -392,6 +408,9 @@ def main(argv: list[str] | None = None) -> int:
             print(exc.code, file=sys.stderr)
             return EXIT_USAGE
         return int(exc.code or 0)
+    except Exception as exc:
+        print(f"revgate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
 
 
 if __name__ == "__main__":

@@ -76,6 +76,7 @@ class Config:
     # sources
     suppression: Path | None = None
     dnc: Path | None = None
+    dnc_exported: date | None = None  # declared DNC export date (replaces mtime)
 
     # explicit logical-field -> header overrides
     columns: dict[str, str] = field(default_factory=dict)
@@ -89,6 +90,11 @@ class Config:
     # provenance
     manifest: Path | None = None
     runs_dir: Path | None = None
+
+    # rules to skip even when unconfigured (explicit opt-out)
+    acknowledge_unconfigured: tuple[str, ...] = ()
+    # rules to disable entirely
+    disable: tuple[str, ...] = ()
 
     # paths the pre-commit hook and CI treat as lead lists
     list_globs: tuple[str, ...] = ("lists/**/*.csv",)
@@ -151,11 +157,18 @@ class Config:
             cfg.suppression = cfg._resolve(supp)
         if sources.get("dnc"):
             cfg.dnc = cfg._resolve(sources["dnc"])
+        if sources.get("dnc_exported"):
+            from datetime import datetime as _dt
+            cfg.dnc_exported = _dt.strptime(str(sources["dnc_exported"]), "%Y-%m-%d").date()
 
         cfg.columns = {str(k): str(v) for k, v in (lint.get("columns", {}) or {}).items()}
 
         if "list_globs" in lint:
             cfg.list_globs = tuple(str(g) for g in lint["list_globs"])
+        if "acknowledge_unconfigured" in lint:
+            cfg.acknowledge_unconfigured = tuple(str(r).upper() for r in lint["acknowledge_unconfigured"])
+        if "disable" in lint:
+            cfg.disable = tuple(str(r).upper() for r in lint["disable"])
 
         red = data.get("redteam", {}) or {}
         if red.get("battery"):

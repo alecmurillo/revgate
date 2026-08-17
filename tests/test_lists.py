@@ -152,9 +152,20 @@ class FailClosedSources(unittest.TestCase):
         finally:
             Path(tmp.name).unlink()
 
-    def test_unconfigured_source_skips_without_blocking(self):
-        # Nothing was promised, so nothing was broken. Reported, not fatal.
+    def test_unconfigured_p0_source_blocks(self):
+        # C1 fix: a P0 gate that cannot run because no source is configured
+        # must block, not silently pass.
         cfg = Config(root=REPO, today=TODAY)
+        result = runner.run(CLEAN, cfg)
+        skips = {s.rule: s for s in result.skipped}
+        self.assertIn("L001", skips)
+        self.assertTrue(skips["L001"].blocking)
+        self.assertEqual(result.exit_code(), EXIT_BLOCKED)
+
+    def test_acknowledged_unconfigured_source_skips_non_blocking(self):
+        # When the operator explicitly acknowledges an unconfigured gate,
+        # it skips non-blocking instead of blocking.
+        cfg = Config(root=REPO, today=TODAY, acknowledge_unconfigured=("L001", "L003", "L018"))
         result = runner.run(CLEAN, cfg)
         skips = {s.rule: s for s in result.skipped}
         self.assertIn("L001", skips)
@@ -216,6 +227,72 @@ class RuleSelection(unittest.TestCase):
                 rule.origin.rstrip().endswith("."),
                 f"{rule.id} origin is not written as a sentence: {rule.origin!r}",
             )
+
+
+class CopyGateSeverity(unittest.TestCase):
+    """M10: L006 raw dates/numbers are P1, merge fields are P0."""
+
+    def test_raw_date_is_p1_not_p0(self):
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write("Company,Domain,copy\nAcme,acme.com,Meeting on 2026-01-15\n")
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            l006 = [f for f in result.findings if f.rule == "L006"]
+            self.assertTrue(l006, "L006 should fire on raw date")
+            self.assertEqual(l006[0].severity, Severity.P1, "raw date should be P1")
+        finally:
+            Path(tmp.name).unlink()
+
+    def test_merge_field_is_p0(self):
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write("Company,Domain,copy\nAcme,acme.com,Hi {{first_name}}\n")
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            l006 = [f for f in result.findings if f.rule == "L006"]
+            self.assertTrue(l006, "L006 should fire on merge field")
+            self.assertEqual(l006[0].severity, Severity.P0, "merge field should be P0")
+        finally:
+            Path(tmp.name).unlink()
+
+    def test_same_value_in_trigger_and_copy_is_one_finding(self):
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write("Company,Domain,trigger,copy\nAcme,acme.com,{{first_name}},Hi {{first_name}}\n")
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            l006 = [f for f in result.findings if f.rule == "L006"]
+            self.assertEqual(len(l006), 1, "same value in trigger and copy = one finding")
+        finally:
+            Path(tmp.name).unlink()
+
+
+class MultipleCTAsOverlap(unittest.TestCase):
+    """M11: L022 must not double-count overlapping CTA matches."""
+
+    def test_overlapping_ctas_count_as_one(self):
+        # "let's chat" and "let's talk" overlap in "let's chat or talk"
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write("Company,Domain,copy\nAcme,acme.com,let's chat or talk\n")
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            l022 = [f for f in result.findings if f.rule == "L022"]
+            self.assertEqual(len(l022), 0, "overlapping CTAs should count as one, not multiple")
+        finally:
+            Path(tmp.name).unlink()
+
+    def test_distinct_ctas_still_fire(self):
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8")
+        tmp.write("Company,Domain,copy\nAcme,acme.com,Schedule a call. Reply to learn more.\n")
+        tmp.close()
+        try:
+            result = runner.run(Path(tmp.name), config())
+            l022 = [f for f in result.findings if f.rule == "L022"]
+            self.assertTrue(l022, "two distinct CTAs should fire L022")
+        finally:
+            Path(tmp.name).unlink()
 
 
 if __name__ == "__main__":

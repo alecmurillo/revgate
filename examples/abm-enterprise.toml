@@ -31,3 +31,11 @@ headcount_exclude_above = 100000
 
 # Enterprise deals have longer cycles; recent contact window is wider.
 recent_contact_days = 30
+
+# Suppression sources — replace these paths with your real data files.
+# The defaults below point at the bundled fixtures so the config runs out
+# of the box. REMOVE THESE and point at your own exports before production.
+[lint.sources]
+suppression = "../fixtures/crm-export.csv"
+dnc = "../fixtures/dnc.csv"
+dnc_exported = "2026-08-10"
