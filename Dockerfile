@@ -40,4 +40,4 @@ EXPOSE 8000
 # The server is single-process. For higher concurrency, run multiple
 # containers behind a load balancer. The server is stateless — each
 # request is evaluated independently.
-CMD ["python3", "-m", "revgate", "serve", "--port", "8000"]
+CMD ["python3", "-m", "revgate", "serve", "--port", "8000", "--host", "0.0.0.0"]

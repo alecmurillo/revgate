@@ -286,7 +286,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     cfg = _base_config(args)
     key = args.key or __import__("os").environ.get("REVGATE_API_KEY", "")
-    serve(port=args.port, auth_key=key or None, config=cfg)
+    serve(port=args.port, auth_key=key or None, config=cfg, host=args.host)
     return 0
 
 
@@ -390,6 +390,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     srv = sub.add_parser("serve", help="run the HTTP gating API for Clay/HubSpot/Apollo webhooks")
     srv.add_argument("--port", type=int, default=8000, help="port to listen on (default: 8000)")
+    srv.add_argument("--host", default="127.0.0.1", help="host to bind (default: 127.0.0.1; use 0.0.0.0 for Docker)")
     srv.add_argument("--key", help="shared secret for X-Revgate-Key auth (default: $REVGATE_API_KEY)")
     srv.add_argument("-c", "--config")
     srv.set_defaults(func=cmd_serve)
