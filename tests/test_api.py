@@ -160,9 +160,12 @@ class TestAdapters(unittest.TestCase):
 
 class TestEvaluate(unittest.TestCase):
     def setUp(self):
-        # Acknowledge that source-dependent P0 gates (suppression, DNC) are
-        # intentionally not configured for these logic tests.
-        self.cfg = Config(acknowledge_unconfigured=("L001", "L003", "L018"))
+        # Acknowledge that source-dependent and column-dependent P0 gates are
+        # intentionally not configured for these logic tests. API rows may
+        # not carry every column the CLI expects from a CSV.
+        self.cfg = Config(acknowledge_unconfigured=(
+            "L001", "L002", "L003", "L004", "L018", "L019",
+        ))
 
     def _load_fixture(self, name: str) -> dict:
         with (FIXTURES / name).open() as fh:
@@ -277,7 +280,9 @@ class TestHTTPServer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.server = create_server(port=0, auth_key="test-secret",
-                                   config=Config(acknowledge_unconfigured=("L001", "L003", "L018")))
+                                   config=Config(acknowledge_unconfigured=(
+                                       "L001", "L002", "L003", "L004", "L018", "L019",
+                                   )))
         # Port 0 lets the OS assign an ephemeral port.
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)

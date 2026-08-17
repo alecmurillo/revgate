@@ -11,6 +11,7 @@ Exit codes are the contract, because the point of the tool is to stop something:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -385,21 +386,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import signal
-    try:
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    except (AttributeError, ValueError):
-        pass
+    # Do NOT set SIGPIPE to SIG_DFL — it kills the process with signal 13
+    # (exit 141) before the BrokenPipeError handler below can preserve the
+    # real exit code. Instead, let Python raise BrokenPipeError on the
+    # next stdout write, catch it, and return whatever code the run computed.
     parser = build_parser()
     args = parser.parse_args(argv)
+    code = EXIT_USAGE
     try:
-        return int(args.func(args))
+        code = int(args.func(args))
+        sys.stdout.flush()
     except BrokenPipeError:
-        try:
-            sys.stdout.close()
-        except Exception:
-            pass
-        return 2  # preserve blocked verdict as default
+        pass  # keep whatever code the run computed
     except KeyboardInterrupt:
         print("\nrevgate: interrupted", file=sys.stderr)
         return EXIT_USAGE
@@ -411,6 +409,15 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"revgate: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    finally:
+        # Redirect stdout to /dev/null before interpreter shutdown so
+        # Python's cleanup flush doesn't re-raise BrokenPipeError.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except OSError:
+            pass
+    return code
 
 
 if __name__ == "__main__":

@@ -99,6 +99,13 @@ jobs:
           echo "exit=$code"
           test "$code" -eq 0 || (echo "provenance failed: a documented Factory surface is broken, or an undocumented one appeared" && exit 1)
 
+      - name: Demo script (end-to-end journey)
+        run: |
+          chmod +x scripts/demo.sh
+          timeout 300 ./scripts/demo.sh
+          code=$?
+          test "$code" -eq 0 || (echo "demo.sh failed with exit $code" && exit 1)
+
   # ---------------------------------------------------------------------------
   # Droid review. Runs the repo's own reviewer droids through `droid exec` on the
   # surfaces most expensive to get wrong: the gates and the batteries. Skips

@@ -58,6 +58,15 @@ class Context:
         else:
             self.skip(rule, reason, blocking=True)
 
+    def skip_missing_column(self, rule: str, column: str) -> None:
+        """Skip because a column the gate needs is absent. P0 gates block
+        unless explicitly acknowledged in config via ``acknowledge_unconfigured``."""
+        reason = f"list has no {column} column to check"
+        if rule in self.acknowledge_unconfigured:
+            self.skip(rule, reason, blocking=False)
+        else:
+            self.skip(rule, reason, blocking=True)
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -229,7 +238,7 @@ def _check_suppression(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
 def _check_recent_contact(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
     rule = "L002"
     if not ds.has("last_contacted"):
-        ctx.skip(rule, "list has no last-contacted column, so recency cannot be checked")
+        ctx.skip_missing_column(rule, "last-contacted")
         return []
 
     today = cfg.reference_date()
@@ -295,7 +304,7 @@ def _check_dnc(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]:
             )
         return []
     if not ds.has("phone"):
-        ctx.skip(rule, "list has no phone column to match on")
+        ctx.skip_missing_column(rule, "phone")
         return []
 
     out: list[Finding] = []
@@ -328,7 +337,7 @@ def _check_jurisdiction(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]
         ctx.skip(rule, "no restricted jurisdictions configured; set [lint].restricted_states if needed")
         return []
     if not ds.has("state"):
-        ctx.skip(rule, "list has no state column, so jurisdiction cannot be checked")
+        ctx.skip_missing_column(rule, "state")
         return []
 
     blocked = {norm_state(s) for s in cfg.restricted_states}
@@ -427,7 +436,7 @@ def _check_unrendered_copy(ds: Dataset, cfg: Config, ctx: Context) -> list[Findi
     rule = "L006"
     targets = [c for c in ("copy", "trigger") if ds.has(c)]
     if not targets:
-        ctx.skip(rule, "list has no copy or trigger column to inspect")
+        ctx.skip_missing_column(rule, "copy or trigger")
         return []
 
     out: list[Finding] = []
@@ -1001,7 +1010,7 @@ def _check_calling_hours(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
     """Send/call time must fall within legal calling hours (8am-9pm local)."""
     rule = "L019"
     if not ds.has("send_time"):
-        ctx.skip(rule, "list has no send-time column; calling hours cannot be checked")
+        ctx.skip_missing_column(rule, "send-time")
         return []
 
     out: list[Finding] = []
@@ -1145,15 +1154,20 @@ def _check_multiple_ctas(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding
         copy = ds.get(row, "copy")
         if not copy:
             continue
-        # Merge overlapping or adjacent matches before counting.
+        # Merge overlapping or nearby matches before counting.
+        # Two CTA phrases within the same clause (no sentence boundary
+        # between them) are likely part of the same ask
+        # (e.g., "let me know if you are open to").
         raw_matches = list(_CTA_RE.finditer(copy))
         if not raw_matches:
             continue
         spans = [(raw_matches[0].start(), raw_matches[0].end(), raw_matches[0].group(0))]
         for m in raw_matches[1:]:
-            if m.start() <= spans[-1][1] + 1:
-                # Overlapping or adjacent — merge into the last span
-                spans[-1] = (spans[-1][0], max(spans[-1][1], m.end()),
+            last_end = spans[-1][1]
+            gap = copy[last_end:m.start()]
+            # Merge if overlapping, adjacent, or no sentence boundary in the gap
+            if m.start() <= last_end + 1 or not re.search(r'[.!?]', gap):
+                spans[-1] = (spans[-1][0], max(last_end, m.end()),
                              spans[-1][2] if len(spans[-1][2]) >= len(m.group(0)) else m.group(0))
             else:
                 spans.append((m.start(), m.end(), m.group(0)))
