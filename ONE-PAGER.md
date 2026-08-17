@@ -20,7 +20,7 @@ Probes commercial failure modes (not content-policy ones): fabricated discounts,
 
 ### `revgate audit` — multi-agent audit with parallel droid exec sessions
 
-Five-phase workflow: planning, pattern gates, parallel agent review (one `droid exec` per finding group, run concurrently), cross-validation synthesis (a final session checks the other agents' work), final report. Each phase is a milestone. Fail-closed if droid is unavailable.
+Six-phase workflow: planning, pattern gates, parallel agent review (one `droid exec` per finding group, run concurrently), root cause analysis (one session sees ALL findings and identifies systemic patterns no individual gate can see), cross-validation synthesis (a final session checks the other agents' work), final report. Each phase is a milestone. Fail-closed if droid is unavailable.
 
 ### `revgate serve` — HTTP API with Clay/HubSpot/Apollo adapters
 
@@ -65,7 +65,7 @@ All 12 claims in `factory-usage.toml` are machine-verified by `revgate provenanc
 
 - Zero dependencies, zero credentials for the default path
 - Python 3.11+, stdlib only
-- 241 tests, no network
+- 245 tests, no network
 - Exit codes: 0 clean, 1 advisory+strict, 2 blocked, 3 usage error
 - Bundled demo agent runs offline and deterministic
 - Shell target for testing any agent that speaks JSON on stdin/stdout
@@ -77,4 +77,4 @@ All 12 claims in `factory-usage.toml` are machine-verified by `revgate provenanc
 
 ## Current state
 
-Pushed to github.com/alecmurillo/revgate. 241 tests pass. Demo asserts all exit codes. Provenance 12/12 verified. CI green.
+Pushed to github.com/alecmurillo/revgate. 245 tests pass. Demo asserts all exit codes. Provenance 12/12 verified. CI green.

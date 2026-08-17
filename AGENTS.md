@@ -17,7 +17,7 @@ revgate/
   agents/       battery loader, target adapters, judges, scenario runner
   batteries/    27 adversarial scenarios (TOML)
   api/          HTTP gating server, source adapters (Clay/HubSpot/Apollo), writeback
-  audit.py      multi-agent audit: 5 phases, parallel droid exec, cross-validation
+  audit.py      multi-agent audit: 6 phases, parallel droid exec, root cause analysis, cross-validation
   provenance.py verifies factory-usage.toml, records run history
   cli.py        lint · redteam · diff · provenance · rules · scenarios · serve · audit
 ```

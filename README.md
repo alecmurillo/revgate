@@ -478,7 +478,7 @@ production.
 
 ## Multi-agent audit
 
-`revgate audit leads.csv --judge droid` runs a five-phase multi-agent workflow
+`revgate audit leads.csv --judge droid` runs a six-phase multi-agent workflow
 that demonstrates a task decomposed across agents with clear milestones:
 
 - **Phase 0 — Planning.** Pattern gates run first (no agent). Findings are
@@ -490,12 +490,18 @@ that demonstrates a task decomposed across agents with clear milestones:
   group, run **in parallel** using `ThreadPoolExecutor`. Each session reviews
   its rule's findings for true positives, false positives, and remediation
   advice. The work is decomposed by rule group, not run sequentially. Milestone 3.
+- **Phase 2.5 — Root cause analysis.** A single `droid exec` session sees
+  ALL findings holistically and identifies systemic patterns that no
+  individual gate can see — because each gate evaluates one rule against one
+  column independently. This is the phase that pattern matching provably
+  cannot do: reasoning across rules, across rows, and across columns to find
+  the upstream cause. Milestone 4.
 - **Phase 3 — Cross-validation synthesis.** A final `droid exec` session
-  reviews all individual assessments for consistency, flags disagreements
-  between reviewers, and produces an overall recommendation. This agent's job
-  is to check the other agents' work. Milestone 4.
+  reviews all individual assessments and the root cause analysis for
+  consistency, flags disagreements between reviewers, and produces an overall
+  recommendation. This agent's job is to check the other agents' work. Milestone 5.
 - **Phase 4 — Final report.** All phases are collected into a structured
-  report with milestone checkpoints, session IDs, and provenance. Milestone 5.
+  report with milestone checkpoints, session IDs, and provenance. Milestone 6.
 
 If `droid` is not available, phases 2-3 report as unjudged and the audit blocks
 — fail-closed, the same invariant as everywhere else. An unevaluated finding
@@ -695,7 +701,7 @@ revgate/
   batteries/    adversarial scenarios (TOML)
   api/          HTTP gating server, source adapters (Clay/HubSpot/Apollo), writeback
   provenance.py verifies factory-usage.toml, records run history
-  audit.py      multi-agent audit: 5 phases, parallel droid exec, cross-validation
+  audit.py      multi-agent audit: 6 phases, parallel droid exec, root cause analysis, cross-validation
   cli.py        lint · redteam · diff · provenance · rules · scenarios · serve · audit
 fixtures/       dirty and clean lead lists, suppression and DNC exports, API fixtures
 examples/       test agent script, example configs for different motions

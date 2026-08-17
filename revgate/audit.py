@@ -1,6 +1,6 @@
 """Multi-agent audit: a task decomposed across agents with clear milestones.
 
-The audit is a five-phase multi-agent workflow that demonstrates Factory's
+The audit is a six-phase multi-agent workflow that demonstrates Factory's
 value proposition for large tasks split across agents:
 
 **Phase 0 — Planning.** The pattern gates run first (no agent). Findings are
@@ -17,14 +17,21 @@ Each session reviews its rule's findings for true positives, false positives,
 and remediation advice. Each session is a milestone. The work is decomposed
 by rule group, not run sequentially. Milestone 3.
 
+**Phase 2.5 — Root cause analysis.** A single ``droid exec`` session sees
+ALL findings holistically and identifies systemic patterns that no individual
+gate can see — because each gate evaluates one rule against one column
+independently. This is the phase that pattern matching provably cannot do:
+reasoning across rules, across rows, and across columns to find the upstream
+cause. Milestone 4.
+
 **Phase 3 — Cross-validation synthesis.** A final ``droid exec`` session
-reviews all individual assessments for consistency, flags disagreements
-between reviewers, and produces an overall recommendation. This is the
-synthesis agent — its job is to check the other agents' work, not to
-evaluate findings directly. Milestone 4.
+reviews all individual assessments and the root cause analysis for
+consistency, flags disagreements between reviewers, and produces an overall
+recommendation. This is the synthesis agent — its job is to check the other
+agents' work, not to evaluate findings directly. Milestone 5.
 
 **Phase 4 — Final report.** All phases are collected into a structured
-report with milestone checkpoints, session IDs, and provenance. Milestone 5.
+report with milestone checkpoints, session IDs, and provenance. Milestone 6.
 
 If ``droid`` is not on PATH, phases 2-3 are reported as unjudged and the
 audit blocks — the fail-closed invariant holds. An unevaluated finding
@@ -64,6 +71,11 @@ _SYNTHESIS_VERDICT_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+_ROOT_CAUSE_RE = re.compile(
+    r'\{.*"root_causes".*\}',
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 @dataclass
 class ReviewPlan:
@@ -99,6 +111,24 @@ class AgentReview:
 
 
 @dataclass
+class RootCause:
+    """A systemic issue identified by the root cause analysis session.
+
+    This is something no individual gate can see because gates evaluate one
+    rule against one column independently. The root cause agent sees the full
+    finding set and reasons across rules, rows, and columns.
+    """
+
+    cause: str = ""
+    affected_rules: list[str] = field(default_factory=list)
+    affected_rows: list[str] = field(default_factory=list)
+    upstream_fix: str = ""
+    session_id: str = ""
+    error: str = ""
+    duration_ms: int = 0
+
+
+@dataclass
 class SynthesisReview:
     """The cross-validation session's assessment of all individual reviews."""
 
@@ -129,6 +159,7 @@ class AuditResult:
     lint_result: Result
     plan: ReviewPlan | None = None
     agent_reviews: list[AgentReview] = field(default_factory=list)
+    root_causes: list[RootCause] = field(default_factory=list)
     synthesis: SynthesisReview | None = None
     phases: list[str] = field(default_factory=list)
     milestones: list[Milestone] = field(default_factory=list)
@@ -144,6 +175,7 @@ class AuditResult:
     @property
     def agent_sessions(self) -> int:
         count = sum(1 for r in self.agent_reviews if r.session_id)
+        count += sum(1 for rc in self.root_causes if rc.session_id)
         if self.synthesis and self.synthesis.session_id:
             count += 1
         return count
@@ -238,13 +270,14 @@ def _review_prompt(rule_id: str, title: str, origin: str, findings: list) -> str
     return "\n".join(lines)
 
 
-def _synthesis_prompt(reviews: list[AgentReview]) -> str:
+def _synthesis_prompt(reviews: list[AgentReview], root_causes: list[RootCause] = None) -> str:
     """Construct the prompt for the cross-validation synthesis session."""
     lines = [
         "You are the synthesis reviewer for a multi-agent audit of a lead list.",
-        "Multiple agent sessions have reviewed individual finding groups. Your job",
+        "Multiple agent sessions have reviewed individual finding groups, and a",
+        "root cause analysis session has identified systemic patterns. Your job",
         "is to cross-validate their assessments, flag disagreements, and produce",
-        "an overall recommendation.",
+        "an overall recommendation that incorporates the root causes.",
         "",
         "Reply with ONLY a single JSON object and nothing else:",
         '{"overall": "blocked" | "advisory" | "clean", '
@@ -262,6 +295,57 @@ def _synthesis_prompt(reviews: list[AgentReview]) -> str:
             lines.append(f"    remediation: {r.remediation}")
         if r.error:
             lines.append(f"    error: {r.error}")
+
+    if root_causes:
+        valid_rc = [rc for rc in root_causes if rc.cause]
+        if valid_rc:
+            lines.append("")
+            lines.append(f"ROOT CAUSE ANALYSIS ({len(valid_rc)} root cause(s)):")
+            for rc in valid_rc:
+                lines.append(f"  cause: {rc.cause}")
+                if rc.affected_rules:
+                    lines.append(f"    affected rules: {', '.join(rc.affected_rules)}")
+                if rc.upstream_fix:
+                    lines.append(f"    upstream fix: {rc.upstream_fix}")
+    return "\n".join(lines)
+
+
+def _root_cause_prompt(findings: list, grouped: list) -> str:
+    """Construct the prompt for the root cause analysis session.
+
+    This session sees ALL findings, not just one rule group. Its job is to
+    identify systemic patterns that no individual gate can see — because
+    each gate evaluates one rule against one column independently.
+    """
+    lines = [
+        "You are a root cause analyst for a lead-list audit.",
+        "Multiple deterministic gates have produced findings. Each gate",
+        "evaluates one rule against one column independently. Your job is",
+        "to look at ALL findings holistically and identify systemic patterns",
+        "that no individual gate can see — root causes that span multiple",
+        "rules, multiple rows, or multiple columns.",
+        "",
+        "Examples of root causes:",
+        '- "12 rows share the same trigger text — upstream list building used a segment label, not a trigger"',
+        '- "Rows 16-20 all have stale enrichment, unverified emails, and calling-hours violations — one bad export batch"',
+        '- "L009 and L010 on the same rows suggest enrichment resolved to holding companies, not operating entities"',
+        "",
+        "Reply with ONLY a single JSON object and nothing else:",
+        '{"root_causes": [{"cause": "<= 200 chars>", "affected_rules": ["L001", ...], '
+        '"affected_rows": ["row 9", ...], "upstream_fix": "<= 200 chars>"}]}',
+        "",
+        f"ALL FINDINGS ({len(findings)} total):",
+    ]
+    for f in findings[:15]:
+        lines.append(f"  - {f.rule}: {f.detail}")
+        if f.key:
+            lines.append(f"    key: {f.key}")
+    if len(findings) > 15:
+        lines.append(f"  ... {len(findings) - 15} more")
+    lines.append("")
+    lines.append(f"RULE GROUPS ({len(grouped)} total):")
+    for rule_id, title, items in grouped:
+        lines.append(f"  {rule_id} ({title}): {len(items)} findings")
     return "\n".join(lines)
 
 
@@ -332,7 +416,7 @@ def audit(
             {"rule": rid, "title": title, "count": len(items), "origin": items[0].origin if items else ""}
             for rid, title, items in grouped
         ],
-        estimated_sessions=len(grouped) + 1,  # +1 for synthesis
+        estimated_sessions=len(grouped) + 2,  # +1 root cause, +1 synthesis
     )
     phases.append(f"Phase 0: Review plan generated ({plan.estimated_sessions} sessions planned)")
     milestones.append(Milestone(
@@ -399,10 +483,73 @@ def audit(
         findings_checked=sum(r.finding_count for r in reviews),
     ))
 
+    # Phase 2.5: Root cause analysis.
+    # One droid session sees ALL findings and identifies systemic patterns
+    # that no individual gate can see. This is the phase that pattern matching
+    # provably cannot do: reasoning across rules, rows, and columns.
+    root_causes: list[RootCause] = []
+    if any(r.session_id for r in reviews):
+        rc_prompt = _root_cause_prompt(lint_result.findings, grouped)
+        rc_response = _ask_droid(rc_prompt)
+
+        if "error" in rc_response:
+            root_causes.append(RootCause(error=rc_response["error"]))
+        else:
+            rc_session_id = str(rc_response.get("session_id") or "")
+            rc_duration = int(rc_response.get("duration_ms") or 0)
+            text = rc_response.get("result", "")
+            rc_parsed = False
+            # Try parsing the full result as JSON first.
+            try:
+                parsed = json.loads(text)
+                rc_parsed = True
+            except (json.JSONDecodeError, ValueError):
+                pass
+            # Fall back to regex extraction.
+            if not rc_parsed:
+                rc_match = _ROOT_CAUSE_RE.search(text)
+                if rc_match:
+                    try:
+                        parsed = json.loads(rc_match.group(0))
+                        rc_parsed = True
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+            if rc_parsed and isinstance(parsed, dict):
+                for item in parsed.get("root_causes", []):
+                    root_causes.append(RootCause(
+                        cause=str(item.get("cause", "")).strip(),
+                        affected_rules=[str(r) for r in item.get("affected_rules", [])],
+                        affected_rows=[str(r) for r in item.get("affected_rows", [])],
+                        upstream_fix=str(item.get("upstream_fix", "")).strip(),
+                        session_id=rc_session_id,
+                        duration_ms=rc_duration,
+                    ))
+            else:
+                root_causes.append(RootCause(
+                    error="no root_causes object in the agent's reply",
+                    session_id=rc_session_id,
+                ))
+
+        rc_session = sum(1 for rc in root_causes if rc.session_id)
+        rc_count = len([rc for rc in root_causes if rc.cause])
+        phases.append(
+            f"Phase 2.5: Root cause analysis complete "
+            f"({rc_count} root cause(s) identified)"
+        )
+        milestones.append(Milestone(
+            phase="root-cause-analysis",
+            status="complete" if rc_count > 0 else "unjudged",
+            detail=f"{rc_count} root cause(s) identified, "
+                   f"{sum(1 for rc in root_causes if rc.error)} error(s)",
+            sessions=rc_session,
+        ))
+    else:
+        phases.append("Phase 2.5: Skipped (no agent sessions ran)")
+
     # Phase 3: Cross-validation synthesis.
     synthesis = SynthesisReview()
     if any(r.session_id for r in reviews):
-        syn_prompt = _synthesis_prompt(reviews)
+        syn_prompt = _synthesis_prompt(reviews, root_causes)
         syn_response = _ask_droid(syn_prompt)
 
         if "error" in syn_response:
@@ -454,6 +601,7 @@ def audit(
         lint_result=lint_result,
         plan=plan,
         agent_reviews=reviews,
+        root_causes=root_causes,
         synthesis=synthesis,
         phases=phases,
         milestones=milestones,
@@ -498,6 +646,21 @@ def render_audit_text(result: AuditResult, strict: bool = False) -> str:
                 lines.append(f"      error: {r.error}")
         lines.append("")
 
+    if result.root_causes:
+        valid_rc = [rc for rc in result.root_causes if rc.cause]
+        if valid_rc:
+            lines.append("  Root cause analysis:")
+            for rc in valid_rc:
+                session = f"session {rc.session_id[:8]}" if rc.session_id else "no session"
+                lines.append(f"    cause: {rc.cause} · {session}")
+                if rc.affected_rules:
+                    lines.append(f"      affected rules: {', '.join(rc.affected_rules)}")
+                if rc.affected_rows:
+                    lines.append(f"      affected rows: {', '.join(rc.affected_rows)}")
+                if rc.upstream_fix:
+                    lines.append(f"      upstream fix: {rc.upstream_fix}")
+            lines.append("")
+
     if result.synthesis:
         lines.append("  Cross-validation synthesis:")
         syn = result.synthesis
@@ -537,6 +700,17 @@ def render_audit_json(result: AuditResult, strict: bool = False) -> str:
         "plan": result.plan.to_dict() if result.plan else None,
         "agent_sessions": result.agent_sessions,
         "unjudged_groups": result.unjudged_groups,
+        "root_causes": [
+            {
+                "cause": rc.cause,
+                "affected_rules": rc.affected_rules,
+                "affected_rows": rc.affected_rows,
+                "upstream_fix": rc.upstream_fix,
+                "session_id": rc.session_id,
+                "error": rc.error,
+            }
+            for rc in result.root_causes
+        ] if result.root_causes else [],
         "agent_reviews": [
             {
                 "rule": r.rule,

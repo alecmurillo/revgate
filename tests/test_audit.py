@@ -17,7 +17,7 @@ sys.path.insert(0, str(_REPO))
 
 from revgate.audit import (
     audit, render_audit_text, render_audit_json,
-    AgentReview, AuditResult, ReviewPlan, SynthesisReview, Milestone,
+    AgentReview, AuditResult, ReviewPlan, SynthesisReview, Milestone, RootCause,
 )
 from revgate.core.config import Config
 from revgate.core.findings import Result, Finding, Severity
@@ -68,7 +68,7 @@ class TestAuditPatternOnly(unittest.TestCase):
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=False)
         self.assertGreaterEqual(len(result.milestones), 2)  # planning + pattern-gates
         for m in result.milestones:
-            self.assertIn(m.phase, ("planning", "pattern-gates", "parallel-review", "cross-validation", "final-report"))
+            self.assertIn(m.phase, ("planning", "pattern-gates", "parallel-review", "root-cause-analysis", "cross-validation", "final-report"))
             self.assertIn(m.status, ("complete", "skipped", "partial", "unjudged"))
 
     def test_phases_include_planning(self):
@@ -128,7 +128,7 @@ class TestAuditMockedDroid(unittest.TestCase):
 
     @staticmethod
     def _mock_droid_response(*args, **kwargs):
-        """Return review or synthesis response based on prompt content."""
+        """Return review, root cause, or synthesis response based on prompt content."""
         argv = args[0] if args else kwargs.get("args", [])
         tmp_file = [a for a in argv if a.endswith(".md")]
         if tmp_file:
@@ -142,6 +142,18 @@ class TestAuditMockedDroid(unittest.TestCase):
                         "num_turns": 1,
                         "is_error": False,
                         "result": '{"overall": "blocked", "disagreements": [], "recommendation": "Fix all P0 issues"}',
+                    }),
+                    stderr="",
+                )
+            if "root cause analyst" in content:
+                return MagicMock(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "session_id": "rootcause-session",
+                        "duration_ms": 1800,
+                        "num_turns": 1,
+                        "is_error": False,
+                        "result": '{"root_causes": [{"cause": "Multiple rows share stale enrichment dates from the same export batch", "affected_rules": ["L015", "L007"], "affected_rows": ["row 16", "row 17"], "upstream_fix": "Re-verify the entire January export batch before sending"}]}',
                     }),
                     stderr="",
                 )
@@ -180,8 +192,8 @@ class TestAuditMockedDroid(unittest.TestCase):
         mock_run.side_effect = self._mock_droid_response
 
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        # Should have 5 milestones: planning, pattern-gates, parallel-review, cross-validation, final-report
-        self.assertEqual(len(result.milestones), 5)
+        # Should have 6 milestones: planning, pattern-gates, parallel-review, root-cause-analysis, cross-validation, final-report
+        self.assertEqual(len(result.milestones), 6)
 
     @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
     @patch("revgate.audit.subprocess.run")
@@ -189,8 +201,8 @@ class TestAuditMockedDroid(unittest.TestCase):
         mock_run.side_effect = self._mock_droid_response
 
         result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
-        # Should have 5 phases: 0, 1, 2, 3, 4
-        self.assertEqual(len(result.phases), 5)
+        # Should have 6 phases: 0, 1, 2, 2.5, 3, 4
+        self.assertEqual(len(result.phases), 6)
 
     @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
     @patch("revgate.audit.subprocess.run")
@@ -232,6 +244,18 @@ class TestAuditMockedDroid(unittest.TestCase):
                         }),
                         stderr="",
                     )
+                if "root cause analyst" in content:
+                    return MagicMock(
+                        returncode=0,
+                        stdout=json.dumps({
+                            "session_id": "rootcause-session",
+                            "duration_ms": 1800,
+                            "num_turns": 1,
+                            "is_error": False,
+                            "result": '{"root_causes": [{"cause": "Stale export batch", "affected_rules": ["L015"], "affected_rows": ["row 16"], "upstream_fix": "Re-verify batch"}]}',
+                        }),
+                        stderr="",
+                    )
             return MagicMock(
                 returncode=0,
                 stdout=json.dumps({
@@ -261,6 +285,55 @@ class TestAuditMockedDroid(unittest.TestCase):
         self.assertIn("Milestones:", text)
         self.assertIn("Cross-validation synthesis:", text)
         self.assertIn("Plan:", text)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_root_cause_analysis(self, mock_run, mock_which):
+        """Root cause analysis session identifies systemic patterns."""
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        self.assertGreater(len(result.root_causes), 0)
+        rc = result.root_causes[0]
+        self.assertTrue(rc.cause)
+        self.assertTrue(rc.session_id)
+        self.assertGreater(len(rc.affected_rules), 0)
+        self.assertTrue(rc.upstream_fix)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_root_cause_in_json(self, mock_run, mock_which):
+        """Root causes appear in JSON output."""
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        js = render_audit_json(result)
+        parsed = json.loads(js)
+        self.assertIn("root_causes", parsed)
+        self.assertGreater(len(parsed["root_causes"]), 0)
+        self.assertTrue(parsed["root_causes"][0]["cause"])
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_root_cause_in_text(self, mock_run, mock_which):
+        """Root causes appear in text output."""
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        text = render_audit_text(result)
+        self.assertIn("Root cause analysis:", text)
+        self.assertIn("upstream fix:", text)
+
+    @patch("revgate.audit.shutil.which", return_value="/usr/local/bin/droid")
+    @patch("revgate.audit.subprocess.run")
+    def test_agent_sessions_includes_root_cause(self, mock_run, mock_which):
+        """agent_sessions count includes the root cause session."""
+        mock_run.side_effect = self._mock_droid_response
+
+        result = audit(FIXTURES / "leads-dirty.csv", self.cfg, use_droid=True)
+        # agent_sessions = review sessions + root cause session + synthesis session
+        expected = len(result.agent_reviews) + 1 + 1  # reviews + root cause + synthesis
+        self.assertEqual(result.agent_sessions, expected)
 
 
 if __name__ == "__main__":
