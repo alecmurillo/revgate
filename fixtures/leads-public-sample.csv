@@ -1,0 +1,21 @@
+company,domain,first_name,last_name,title,email,email_status,phone,state,headcount,trigger,copy,enriched_date,last_contacted,send_time
+Stripe,stripe.com,Patrick,Collison,CEO,patrick@stripe.com,verified,4155550100,CA,8000,"Series A announced","Hi Patrick, saw the Series A news.",2026-07-01,,10:00
+Notion,notion.so,Ivan,Zhao,Founder,ivan@notion.so,verified,4155550101,CA,300,"Launched AI features","Hi Ivan, the AI features look great.",2026-07-15,,11:00
+Figma,figma.com,Dylan,Field,CEO,dylan@figma.com,verified,4155550102,CA,1200,"Raised $200M","Hi Dylan, congratulations on the round.",2026-06-01,,14:00
+Linear,linear.app,Karri,Saarinen,CEO,karri@linear.app,verified,4155550103,CA,80,"Series A announced","Hi Karri, saw the Series A news.",2026-07-01,,09:30
+Vercel,vercel.com,Guillermo,Rauch,CEO,guillermo@vercel.com,verified,4155550104,CA,500,"Launched Edge Functions","Hi Guillermo, the Edge Functions launch is impressive.",2026-07-20,,10:00
+Airtable,airtable.com,Howie,Liu,CEO,howie@airtable.com,verified,4155550105,CA,600,"Series B announced","Hi Howie, congratulations on the Series B.",2026-05-01,,13:00
+Retool,retool.com,David,Khassanov,CTO,david@retool.com,verified,4155550106,CA,400,"Hiring engineers","Hi David, noticed the hiring push.",2026-07-10,,15:00
+Ramp,ramp.com,Eric,Glyman,CEO,eric@ramp.com,verified,4155550107,NY,650,"Series C announced","Hi Eric, congratulations on the Series C.",2026-07-01,,10:00
+Brex,brex.com,Henrique,Dubugras,CEO,henrique@brex.com,verified,4155550108,CA,900,"Series D announced","Hi Henrique, the Series D is huge.",2026-04-01,,11:30
+Plaid,plaid.com,Zach,Perret,CEO,zach@plaid.com,verified,4155550109,CA,1200,"Acquired another company","Hi Zach, saw the acquisition news.",2026-03-01,,09:00
+Rippling,rippling.com,Parker,Conrad,CEO,parker@rippling.com,verified,4155550110,CA,700,"Series D announced","Hi Parker, congratulations on the round.",2026-06-15,,16:00
+Cresta,cresta.ai,Zayd,Memon,CTO,zayd@cresta.ai,verified,4155550111,CA,250,"Raised $80M","Hi Zayd, the $80M raise is impressive.",2026-07-01,,10:30
+Sequoia Capital,sequoiacap.com,Roelof,Botha,Partner,roelof@sequoiacap.com,verified,4155550112,CA,50,"Series A announced","Hi Roelof, saw the Series A news.",2026-07-01,,10:00
+Andreesen Horowitz,a16z.com,Marc,Andreessen,Partner,marc@a16z.com,verified,4155550113,CA,40,"Series A announced","Hi Marc, saw the Series A news.",2026-07-01,,10:00
+Acme Logistics,acme-trucking.com,Bob,Smith,VP Ops,info@acme-trucking.com,verified,4155550114,TX,15,"Series A announced","Hi {{first_name}}, saw the news.",2026-01-01,,22:00
+Globex Freight,globexfreight.com,Alice,Lee,COO,alice@globexfreight.com,unverified,4155550115,GA,35,"Series A announced","Hi Alice, reaching out.",2026-02-01,,23:30
+Initech Solutions,initech.com,,Johnson,Manager,,verified,4155550116,OH,200,"Series A announced","Hi there, wanted to connect.",2026-07-01,,10:00
+Umbrella Corp,umbrella.com,Albert,Wesker,CTO,albert@umbrella.com,verified,8005550100,NV,5000,"Series A announced","Hi Albert, congratulations on the round.",2025-01-01,,08:00
+Soylent Corp,soylent.com,William,Riker,VP Sales,william@soylent.com,verified,4155550118,FL,800,"Series A announced","Hi William, saw the news.",2026-07-01,,09:00
+Stark Industries,stark.com,Tony,Stark,CEO,tony@stark.com,verified,4155550119,CA,10000,"Series A announced","Hi Tony, congratulations on the Series A.",2026-07-01,,10:00
