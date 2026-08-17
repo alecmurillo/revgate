@@ -40,10 +40,21 @@ def _finish(result: Result, cfg: Config, args: argparse.Namespace) -> int:
     config_path = getattr(cfg, "source_path", None)
     if config_path:
         result.notes.append(f"config: {config_path}")
-    _emit(render(result, args.format, cfg.strict), getattr(args, "out", None))
+
+    # Compute the exit code BEFORE any output. The pipe can close during
+    # _emit (BrokenPipeError), and the exit code must already be decided
+    # by then — not computed after the write that can fail.
+    code = result.exit_code(cfg.strict)
+    try:
+        _emit(render(result, args.format, cfg.strict), getattr(args, "out", None))
+    except BrokenPipeError:
+        pass  # verdict already decided
     if not getattr(args, "no_record", False):
-        provenance_mod.record_run(cfg, result)
-    return result.exit_code(cfg.strict)
+        try:
+            provenance_mod.record_run(cfg, result)
+        except BrokenPipeError:
+            pass
+    return code
 
 
 def _base_config(args: argparse.Namespace) -> Config:

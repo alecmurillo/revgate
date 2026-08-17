@@ -61,11 +61,15 @@ class Context:
     def skip_missing_column(self, rule: str, column: str) -> None:
         """Skip because a column the gate needs is absent. P0 gates block
         unless explicitly acknowledged in config via ``acknowledge_unconfigured``."""
-        reason = f"list has no {column} column to check"
         if rule in self.acknowledge_unconfigured:
-            self.skip(rule, reason, blocking=False)
+            self.skip(rule, f"list has no {column} column to check", blocking=False)
         else:
-            self.skip(rule, reason, blocking=True)
+            self.skip(
+                rule,
+                f"list has no {column} column to check — add \"{rule}\" to "
+                f"[lint].acknowledge_unconfigured if this list is intentionally without it",
+                blocking=True,
+            )
 
 
 @dataclass(frozen=True)
