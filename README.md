@@ -121,7 +121,7 @@ python3 -m revgate lint fixtures/leads-dirty.csv --today 2026-08-16 --format htm
 
 ### Factory / Droid integration (condensed)
 
-This repo uses Factory in **7 places**, and every claim is **machine-verified**
+This repo uses Factory in **six places**, and every claim is **machine-verified**
 rather than asserted:
 
 ```bash
@@ -136,7 +136,10 @@ python3 -m revgate provenance    # 12 claims, 12 verified, 6 surfaces
 | `droid exec` as judge | semantic assertions via the operator's session, no second API key |
 | Multi-agent audit | parallel `droid exec` sessions with cross-validation synthesis |
 | CI | gate (credential-free), droid-review, docker-smoke, droid-audit |
-| AGENTS.md | project context droid loads on every session |
+
+`AGENTS.md` is also a provenance claim (FX12, verified) — droid loads it on
+every session for project context — but it is documentation, not a Factory
+surface, so it is not counted in the six.
 
 **Droid as runtime, not dependency.** Everything works without droid. Unjudged
 is never a pass. Full details in the [Factory / Droid integration](#factory--droid-integration)
