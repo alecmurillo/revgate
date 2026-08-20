@@ -159,7 +159,7 @@ prevents.
 | P0 | `L001` suppression-collision | Row already in your CRM or suppression export |
 | P0 | `L002` recent-contact | Somebody a rep called six days ago |
 | P0 | `L003` do-not-call | A number on the DNC export |
-| P0 | `L004` restricted-jurisdiction | A row in a jurisdiction the motion is not cleared for |
+| P0 | `L004` restricted-jurisdiction | A row in a jurisdiction you configured as restricted for this motion |
 | P0 | `L005` missing-trigger | Empty triggers, unverifiable ones, and one trigger pasted across the whole list |
 | P0 | `L006` unrendered-copy | `{{first_name}}`, raw timestamps, nine-digit numbers, and the double space a merge field leaves when it renders empty |
 | P1 | `L007` email-unverified | Catch-all domains, which pass verification and then bounce |
@@ -202,12 +202,15 @@ that's a $50,120 statutory violation per call. Flagging it instead of removing i
 assumes every downstream tool reads the flag column — most don't. The row needs
 to be gone, not annotated.
 
-**L004 restricted-jurisdiction.** These accounts are in a state your motion isn't
-cleared for. State telemarketing laws vary wildly: Connecticut is $20,000 per
-violation, Georgia has no damage cap, Texas requires a $10,000 bond. The
-enrichment vendor's UI doesn't show jurisdiction restrictions, so this constraint
-is invisible while you're building the list. You supply the restricted states in
-`revgate.toml` because the restrictions depend on your specific motion.
+**L004 restricted-jurisdiction.** These accounts are in a state you configured
+as restricted for this motion. State-level telemarketing restrictions vary by
+jurisdiction and by the type of call — B2B calls are often exempt from consumer
+telemarketing rules, and whether a restriction applies depends on what you're
+selling, who you're calling, and how. The tool does not determine which
+jurisdictions are legally restricted — you configure that with counsel, and the
+gate enforces your decision. The enrichment vendor's UI doesn't show
+jurisdiction restrictions, so this constraint is invisible while you're building
+the list. You supply the restricted states in `revgate.toml`.
 
 **L005 missing-trigger.** A trigger column where every row says "series a
 announced" is a segment label, not a trigger. When your email tool merges it into

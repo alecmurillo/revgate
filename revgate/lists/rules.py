@@ -51,8 +51,10 @@ COMPLIANCE_REFERENCES = {
         "this gate does not replace review by counsel."
     ),
     "restricted_jurisdiction_basis": (
-        "Some jurisdictions restrict unsolicited contact. This gate is an "
-        "operational safeguard, not legal advice — confirm with counsel."
+        "You configured this jurisdiction as restricted for this motion. "
+        "The tool does not determine which jurisdictions are legally restricted — "
+        "that is your call with counsel. This gate enforces your decision, "
+        "not a legal determination."
     ),
     "disclaimer": "Not legal advice. Verify current requirements with counsel.",
 }
@@ -376,8 +378,8 @@ def _check_jurisdiction(ds: Dataset, cfg: Config, ctx: Context) -> list[Finding]
         if st and st in blocked:
             out.append(Finding(
                 rule=rule, severity=P0,
-                title="Row sits in a restricted jurisdiction",
-                detail=f"state {raw or st} is on the restricted list",
+                title="Row sits in a jurisdiction you configured as restricted",
+                detail=f"state {raw or st} is on your restricted list (configured in revgate.toml)",
                 remedy="Remove the row, or route it to a channel cleared for that jurisdiction.",
                 origin=COMPLIANCE_REFERENCES["restricted_jurisdiction_basis"],
                 row=n, key=ds.label(row), column=ds.column("state"),
@@ -1218,7 +1220,7 @@ RULES: tuple[Rule, ...] = (
          "Number appears on the do-not-call source",
          "Remove, never flag.", _check_dnc),
     Rule("L004", "restricted-jurisdiction", P0,
-         "Row sits in a jurisdiction this motion is not cleared for",
+         "Row sits in a jurisdiction you configured as restricted for this motion",
          COMPLIANCE_REFERENCES["restricted_jurisdiction_basis"], _check_jurisdiction),
     Rule("L005", "missing-trigger", P0,
          "Row carries no specific, checkable reason for the outreach",

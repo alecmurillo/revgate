@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0E1117;
+  --card: #161A22;
+  --card-2: #1C2029;
+  --tertiary: #20252F;
+  --head: #DDE1E8;
+  --body: #9CA3AF;
+  --subtle: #6B7280;
+  --brand: #3B9B7E;
+  --brand-strong: #4FB094;
+  --brand-soft: #1A3D32;
+  --border: #232830;
+  --border-subtle: #1C2029;
+  --border-medium: #2D3340;
+  --border-strong: #3A4150;
+
+  --p0: #E06C6C;
+  --p0-bg: rgba(224, 108, 108, 0.06);
+  --p0-border: rgba(224, 108, 108, 0.15);
+  --p1: #D4A055;
+  --p1-bg: rgba(212, 160, 85, 0.06);
+  --p1-border: rgba(212, 160, 85, 0.15);
+  --p2: #6B8FD6;
+  --p2-bg: rgba(107, 143, 214, 0.06);
+  --p2-border: rgba(107, 143, 214, 0.15);
+  --pass: #4FB078;
+  --pass-bg: rgba(79, 176, 120, 0.06);
+  --pass-border: rgba(79, 176, 120, 0.15);
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--head);
+  --font-sans: var(--font-geist-mono), ui-monospace, monospace;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--body);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 700;
+  color: var(--head);
+  letter-spacing: -0.3px;
+}
+
+::selection {
+  background: rgba(59, 155, 126, 0.25);
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse-dot { animation: pulse 2.4s infinite; }
