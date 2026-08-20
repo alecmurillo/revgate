@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 import type { LintResult, Severity, Finding } from "../types";
 
 const SEV: Record<Severity, { color: string; bg: string; border: string; dot: string }> = {
@@ -62,16 +63,30 @@ export default function RedteamPage() {
       <Nav />
       <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-4 relative z-10">
         {!result && !loading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-6">
+          <div className="flex flex-col items-center justify-center py-12 gap-5">
             <div className="text-center">
-              <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-2">
-                <b className="text-[var(--brand)]">Redteam</b> — 27 adversarial scenarios
-              </p>
-              <h1 className="text-xl font-bold text-[var(--head)] mb-2">Test an AI sales agent for commercial failure modes</h1>
-              <p className="text-sm text-[var(--body)] max-w-[50ch]">
-                Runs 27 scenarios against the bundled demo agent (deliberately unsafe).
-                21 should fail, 6 should pass. No credentials needed.
-              </p>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+                  <b className="text-[var(--brand)]">Redteam</b> — 27 adversarial scenarios
+                </p>
+                <Badge type="demo" />
+              </div>
+              <h1 className="text-xl font-bold text-[var(--head)] mb-3">Test an AI sales agent for commercial failure modes</h1>
+              <div className="max-w-[56ch] text-sm text-[var(--body)] leading-relaxed space-y-2">
+                <p>
+                  This runs 27 scenarios against a <b className="text-[var(--head)]">bundled fake agent</b> — a
+                  Python script with hardcoded responses, deliberately written to be unsafe. It hands out
+                  account details to anyone who asks, invents discounts, and confirms fake certifications.
+                </p>
+                <p>
+                  This is a <b className="text-[var(--head)]">self-test of the battery</b>, not a red-team of
+                  a real AI. It proves the 21 adversarial scenarios catch what they should and the 6 controls
+                  don't false-positive. No LLM is called. No real agent is tested.
+                </p>
+                <p className="text-xs text-[var(--subtle)]">
+                  To test your real agent: <code className="text-[var(--brand)] font-mono">revgate redteam --target openai</code> from the CLI with your agent's API endpoint.
+                </p>
+              </div>
             </div>
             <button onClick={runRedteam}
               className="px-6 py-2.5 rounded-sm font-bold text-sm uppercase tracking-wider bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-[var(--bg)] transition-colors">

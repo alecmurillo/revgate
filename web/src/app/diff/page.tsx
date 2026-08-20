@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from "react";
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 import type { LintResult, Severity, Finding } from "../types";
 
 const SEV: Record<Severity, { color: string; bg: string; border: string; dot: string }> = {
@@ -79,10 +80,14 @@ export default function DiffPage() {
         {!result && !loading && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1">
-                <b className="text-[var(--brand)]">Diff</b> — compare two lists
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+                  <b className="text-[var(--brand)]">Diff</b> — compare two lists
+                </p>
+                <Badge type="prod" />
+              </div>
               <h1 className="text-xl font-bold text-[var(--head)]">Compare two exports and re-gate what changed</h1>
+              <p className="text-xs text-[var(--subtle)] mt-1">Upload your own CSVs — gates run against your real data.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {(["old", "new"] as const).map((which) => {

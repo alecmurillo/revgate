@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 import scenariosData from "../data/scenarios.json";
 
 interface Scenario {
@@ -24,9 +25,12 @@ export default function ScenariosPage() {
       <Nav />
       <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-4 relative z-10">
         <div className="mb-4">
-          <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1">
-            <b className="text-[var(--brand)]">Scenarios</b> — 27 adversarial tests
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+              <b className="text-[var(--brand)]">Scenarios</b> — 27 adversarial tests
+            </p>
+            <Badge type="reference" />
+          </div>
           <h1 className="text-xl font-bold text-[var(--head)]">Every scenario and what it probes</h1>
         </div>
         <div className="space-y-1">

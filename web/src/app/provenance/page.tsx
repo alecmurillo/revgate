@@ -1,6 +1,7 @@
 "use client";
 
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 import provenanceData from "../data/provenance.json";
 
 interface ProvenanceResult {
@@ -18,10 +19,14 @@ export default function ProvenancePage() {
       <Nav />
       <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-4 relative z-10">
         <div className="mb-4">
-          <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1">
-            <b className="text-[var(--brand)]">Provenance</b> — machine-verified claims
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+              <b className="text-[var(--brand)]">Provenance</b> — machine-verified claims
+            </p>
+            <Badge type="verified" />
+          </div>
           <h1 className="text-xl font-bold text-[var(--head)]">Every Factory surface, verified</h1>
+          <p className="text-xs text-[var(--subtle)] mt-1">Pre-verified at build time. Re-run with <code className="text-[var(--brand)] font-mono">revgate provenance</code> from the CLI.</p>
         </div>
         <div className="animate-fade-in space-y-4">
           <div className="flex items-center gap-4 flex-wrap">

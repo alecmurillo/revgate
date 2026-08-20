@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Nav from "./components/Nav";
+import { Badge } from "./components/Badge";
 
 export default function Home() {
   return (
@@ -45,12 +46,12 @@ export default function Home() {
               <b className="text-[var(--brand)]">02</b> — What it does
             </p>
             <div className="grid grid-cols-2 gap-px bg-[var(--border)] border border-[var(--border)] rounded-sm flex-1 overflow-y-auto min-h-0">
-              <MiniFeature title="Dedupe" desc="Duplicate accounts by domain, duplicate phones, suppression collisions, DNC hits." link="/lint" />
-              <MiniFeature title="Gate" desc="Restricted states, merge fields, stale data, headcount ceilings, wrong seniority." />
-              <MiniFeature title="Red-team" desc="27 adversarial scenarios against AI sales agents. 21 fail, 6 pass controls." />
-              <MiniFeature title="HTTP API" desc="Clay, HubSpot, Apollo adapters. Writeback fields. Fail-closed at the wire." />
-              <MiniFeature title="Diff" desc="Compare two exports, re-gate only the rows that changed." />
-              <MiniFeature title="Provenance" desc="12 Factory claims, 12 machine-verified. Checked, not asserted." />
+              <MiniFeature title="Dedupe" desc="Duplicate accounts by domain, duplicate phones, suppression collisions, DNC hits." link="/lint" badge="prod" />
+              <MiniFeature title="Gate" desc="Restricted states, merge fields, stale data, headcount ceilings, wrong seniority." badge="prod" />
+              <MiniFeature title="Red-team" desc="Runs against a fake demo agent. Self-test of the battery, not a real agent." badge="demo" />
+              <MiniFeature title="HTTP API" desc="Clay, HubSpot, Apollo adapters. CLI only — not in the web UI." badge="prod" />
+              <MiniFeature title="Diff" desc="Compare two exports, re-gate only the rows that changed." link="/diff" badge="prod" />
+              <MiniFeature title="Provenance" desc="12 Factory claims, 12 machine-verified at build time." badge="verified" />
             </div>
           </div>
 
@@ -90,10 +91,13 @@ export default function Home() {
   );
 }
 
-function MiniFeature({ title, desc, link }: { title: string; desc: string; link?: string }) {
+function MiniFeature({ title, desc, link, badge }: { title: string; desc: string; link?: string; badge?: "prod" | "demo" | "reference" | "verified" }) {
   return (
     <div className="bg-[var(--card)] p-2.5 hover:bg-[var(--card-2)] transition-colors flex flex-col">
-      <h3 className="text-sm font-bold text-[var(--head)] mb-0.5">{title}</h3>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <h3 className="text-sm font-bold text-[var(--head)]">{title}</h3>
+        {badge && <Badge type={badge} />}
+      </div>
       <p className="text-xs text-[var(--body)] leading-relaxed flex-1">{desc}</p>
       {link && (
         <Link href={link} className="text-xs text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold mt-1">

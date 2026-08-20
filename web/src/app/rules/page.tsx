@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 import rulesData from "../data/rules.json";
 
 interface Rule { id: string; name: string; severity: string; summary: string; origin: string; }
@@ -31,9 +32,12 @@ export default function RulesPage() {
       <Nav />
       <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-4 relative z-10">
         <div className="mb-4">
-          <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1">
-            <b className="text-[var(--brand)]">Rules</b> — 22 gates
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+              <b className="text-[var(--brand)]">Rules</b> — 22 gates
+            </p>
+            <Badge type="reference" />
+          </div>
           <h1 className="text-xl font-bold text-[var(--head)]">Every gate and the mistake it prevents</h1>
         </div>
         <div className="space-y-3">

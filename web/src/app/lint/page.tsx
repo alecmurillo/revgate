@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import type { LintResult, Severity, Finding } from "../types";
 import Nav from "../components/Nav";
+import { Badge } from "../components/Badge";
 
 const SEV: Record<Severity, { color: string; bg: string; border: string; dot: string }> = {
   P0: { color: "var(--p0)", bg: "var(--p0-bg)", border: "var(--p0-border)", dot: "bg-[var(--p0)]" },
@@ -96,10 +97,14 @@ export default function LintPage() {
         {!hasResults && !loading && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1">
-                <b className="text-[var(--brand)]">Lint</b> — upload a CSV
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)]">
+                  <b className="text-[var(--brand)]">Lint</b> — upload a CSV
+                </p>
+                <Badge type="prod" />
+              </div>
               <h1 className="text-xl font-bold text-[var(--head)]">Run 22 gates against a lead list</h1>
+              <p className="text-xs text-[var(--subtle)] mt-1">Upload your own CSV — the 22 gates run against your real data.</p>
             </div>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
