@@ -30,9 +30,14 @@ export default function RedteamPage() {
     setLoading(true); setError(null); setResult(null); setExpandedGroups(new Set());
     try {
       const res = await fetch("/api/redteam", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || "Failed to run redteam");
-      else setResult(data as LintResult);
+      if (!res.ok) {
+        const text = await res.text();
+        try { setError(JSON.parse(text).error || text.slice(0, 200)); }
+        catch { setError(`Server error (${res.status}): ${text.slice(0, 200)}`); }
+      } else {
+        try { setResult(await res.json() as LintResult); }
+        catch { setError("Failed to parse server response."); }
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Network error"); }
     finally { setLoading(false); }
   };

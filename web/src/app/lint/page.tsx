@@ -38,8 +38,11 @@ export default function LintPage() {
   const [activeFilters, setActiveFilters] = useState<Set<Severity>>(new Set(["P0", "P1", "P2"]));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  const MAX_CSV_SIZE = 4_000_000; // 4MB — Vercel Hobby body limit is 4.5MB
+
   const handleFile = useCallback((f: File) => {
     if (!f.name.endsWith(".csv")) { setError("Please upload a CSV file"); return; }
+    if (f.size > MAX_CSV_SIZE) { setError(`File is ${(f.size / 1_000_000).toFixed(1)}MB. Vercel's free tier limit is 4.5MB — try a smaller file or use the CLI: revgate lint yourfile.csv`); return; }
     setError(null); setFile(f); setResult(null);
   }, []);
 
@@ -58,9 +61,14 @@ export default function LintPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv: csvText, today }),
       });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || "Failed to run lint");
-      else setResult(data as LintResult);
+      if (!res.ok) {
+        const text = await res.text();
+        try { setError(JSON.parse(text).error || text.slice(0, 200)); }
+        catch { setError(`Server error (${res.status}): ${text.slice(0, 200)}`); }
+      } else {
+        try { setResult(await res.json() as LintResult); }
+        catch { setError("Failed to parse server response. Try again or use the CLI: revgate lint yourfile.csv"); }
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Network error"); }
     finally { setLoading(false); }
   }, [file, today]);

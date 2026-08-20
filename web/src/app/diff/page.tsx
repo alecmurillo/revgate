@@ -29,8 +29,11 @@ export default function DiffPage() {
   const oldInputRef = useRef<HTMLInputElement>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_CSV_SIZE = 4_000_000;
+
   const handleFile = useCallback((f: File, which: "old" | "new") => {
     if (!f.name.endsWith(".csv")) { setError("Please upload CSV files"); return; }
+    if (f.size > MAX_CSV_SIZE) { setError(`File is ${(f.size / 1_000_000).toFixed(1)}MB. Vercel's free tier limit is 4.5MB — try a smaller file or use the CLI: revgate diff old.csv new.csv`); return; }
     setError(null);
     if (which === "old") setOldFile(f); else setNewFile(f);
     setResult(null);
@@ -47,9 +50,14 @@ export default function DiffPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ oldCsv, newCsv, today }),
       });
-      const data = await res.json();
-      if (!res.ok) setError(data.error || "Failed to run diff");
-      else setResult(data as LintResult);
+      if (!res.ok) {
+        const text = await res.text();
+        try { setError(JSON.parse(text).error || text.slice(0, 200)); }
+        catch { setError(`Server error (${res.status}): ${text.slice(0, 200)}`); }
+      } else {
+        try { setResult(await res.json() as LintResult); }
+        catch { setError("Failed to parse server response. Try again or use the CLI: revgate diff old.csv new.csv"); }
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Network error"); }
     finally { setLoading(false); }
   };
