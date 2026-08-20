@@ -15,7 +15,7 @@ const SEV_ORDER = ["P0", "P1", "P2"];
 export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["P0", "P1", "P2"]));
 
   useEffect(() => {
     fetch("/api/rules").then(r => r.json()).then(d => { setRules(d); setLoading(false); }).catch(() => setLoading(false));
