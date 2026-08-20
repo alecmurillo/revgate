@@ -1,0 +1,23 @@
+{
+  "surface": "provenance",
+  "target": "/Users/alecmurillo/Desktop/revgate/factory-usage.toml",
+  "verdict": "PASS",
+  "exit_code": 0,
+  "counts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "stats": {
+    "claims": 12,
+    "verified": 12,
+    "surfaces": 6
+  },
+  "findings": [],
+  "skipped": [],
+  "notes": [
+    "Surfaces claimed: code \u00d73, droid \u00d73, droid exec \u00d72, hooks \u00d71, skill \u00d72, workflow \u00d71",
+    "12/12 claims verified present against the files they name. 'Verified' means the file exists and carries the expected fields \u2014 not that the surface has been exercised in a live run.",
+    "config: /Users/alecmurillo/Desktop/revgate/revgate.toml"
+  ]
+}

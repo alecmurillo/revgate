@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Nav from "../components/Nav";
+import provenanceData from "../data/provenance.json";
 
 interface ProvenanceResult {
   verdict: string; exit_code: number;
@@ -10,18 +10,9 @@ interface ProvenanceResult {
   findings: { rule: string; severity: string; title: string; detail: string }[];
 }
 
+const result = provenanceData as ProvenanceResult;
+
 export default function ProvenancePage() {
-  const [result, setResult] = useState<ProvenanceResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/provenance").then(r => r.json()).then(d => {
-      if (d.error) { setError(d.error); setLoading(false); return; }
-      setResult(d); setLoading(false);
-    }).catch(() => { setError("Failed to run provenance"); setLoading(false); });
-  }, []);
-
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
@@ -32,49 +23,41 @@ export default function ProvenancePage() {
           </p>
           <h1 className="text-xl font-bold text-[var(--head)]">Every Factory surface, verified</h1>
         </div>
-
-        {loading && <p className="text-sm text-[var(--subtle)]">Verifying...</p>}
-        {error && <div className="p-3 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-sm text-red-400">{error}</div>}
-
-        {result && (
-          <div className="animate-fade-in space-y-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border"
-                style={{ background: "var(--pass-bg)", borderColor: "var(--pass-border)" }}>
-                <span className="text-lg font-bold text-[var(--pass)]">✓</span>
-                <span className="text-sm font-bold text-[var(--pass)]">{result.verdict}</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-[var(--subtle)]">
-                <span><b className="text-[var(--head)]">{result.stats.claims}</b> claims</span>
-                <span><b className="text-[var(--head)]">{result.stats.verified}</b> verified</span>
-                <span><b className="text-[var(--head)]">{result.stats.surfaces}</b> surfaces</span>
-              </div>
+        <div className="animate-fade-in space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border"
+              style={{ background: "var(--pass-bg)", borderColor: "var(--pass-border)" }}>
+              <span className="text-lg font-bold text-[var(--pass)]">✓</span>
+              <span className="text-sm font-bold text-[var(--pass)]">{result.verdict}</span>
             </div>
-
-            {result.notes?.length > 0 && (
-              <div className="space-y-1">
-                {result.notes.map((n, i) => (
-                  <div key={i} className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--body)] leading-relaxed">
-                    {n}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {result.findings?.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs text-[var(--subtle)] uppercase tracking-wider">Unverified claims</p>
-                {result.findings.map((f, i) => (
-                  <div key={i} className="rounded-sm border border-[var(--p0-border)] bg-[var(--card)] px-3 py-2 text-xs">
-                    <span className="font-mono font-bold text-[var(--p0)]">{f.rule}</span>
-                    <span className="text-[var(--head)] ml-2">{f.title}</span>
-                    <p className="text-[var(--body)] mt-0.5">{f.detail}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="flex items-center gap-3 text-xs text-[var(--subtle)]">
+              <span><b className="text-[var(--head)]">{result.stats.claims}</b> claims</span>
+              <span><b className="text-[var(--head)]">{result.stats.verified}</b> verified</span>
+              <span><b className="text-[var(--head)]">{result.stats.surfaces}</b> surfaces</span>
+            </div>
           </div>
-        )}
+          {result.notes?.length > 0 && (
+            <div className="space-y-1">
+              {result.notes.map((n, i) => (
+                <div key={i} className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--body)] leading-relaxed">
+                  {n}
+                </div>
+              ))}
+            </div>
+          )}
+          {result.findings?.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-[var(--subtle)] uppercase tracking-wider">Unverified claims</p>
+              {result.findings.map((f, i) => (
+                <div key={i} className="rounded-sm border border-[var(--p0-border)] bg-[var(--card)] px-3 py-2 text-xs">
+                  <span className="font-mono font-bold text-[var(--p0)]">{f.rule}</span>
+                  <span className="text-[var(--head)] ml-2">{f.title}</span>
+                  <p className="text-[var(--body)] mt-0.5">{f.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

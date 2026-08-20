@@ -1,0 +1,156 @@
+[
+  {
+    "id": "L001",
+    "name": "suppression-collision",
+    "severity": "P0",
+    "summary": "Row already exists in the suppression or CRM source",
+    "origin": "Suppress before you enrich, not after."
+  },
+  {
+    "id": "L002",
+    "name": "recent-contact",
+    "severity": "P0",
+    "summary": "Row was contacted inside the cooling-off window",
+    "origin": "Deal stage misses somebody who was called yesterday."
+  },
+  {
+    "id": "L003",
+    "name": "do-not-call",
+    "severity": "P0",
+    "summary": "Number appears on the do-not-call source",
+    "origin": "Remove, never flag."
+  },
+  {
+    "id": "L004",
+    "name": "restricted-jurisdiction",
+    "severity": "P0",
+    "summary": "Row sits in a jurisdiction you configured as restricted for this motion",
+    "origin": "You configured this jurisdiction as restricted for this motion. The tool does not determine which jurisdictions are legally restricted \u2014 that is your call with counsel. This gate enforces your decision, not a legal determination."
+  },
+  {
+    "id": "L005",
+    "name": "missing-trigger",
+    "severity": "P0",
+    "summary": "Row carries no specific, checkable reason for the outreach",
+    "origin": "Empty personalisation is worse than none."
+  },
+  {
+    "id": "L006",
+    "name": "unrendered-copy",
+    "severity": "P0",
+    "summary": "Copy still contains placeholders, raw values, or holes",
+    "origin": "Sending tools print whatever is in the cell."
+  },
+  {
+    "id": "L007",
+    "name": "email-unverified",
+    "severity": "P1",
+    "summary": "Address is unverified or on a catch-all domain",
+    "origin": "Catch-all passes verification and then bounces."
+  },
+  {
+    "id": "L008",
+    "name": "mailbox-shape",
+    "severity": "P2",
+    "summary": "Address is a role mailbox, a free provider, or off-domain",
+    "origin": "A reply nobody owns is a reply nobody answers."
+  },
+  {
+    "id": "L009",
+    "name": "name-domain-mismatch",
+    "severity": "P1",
+    "summary": "Company name and domain do not correspond",
+    "origin": "Name matches lie."
+  },
+  {
+    "id": "L010",
+    "name": "non-operating-entity",
+    "severity": "P1",
+    "summary": "Row is a fund, holding entity, or property vehicle",
+    "origin": "Filing sources are majority non-operating entities."
+  },
+  {
+    "id": "L011",
+    "name": "headcount-ceiling",
+    "severity": "P1",
+    "summary": "Row is larger than the motion is built for",
+    "origin": "One explicit ceiling beats an implicit filter."
+  },
+  {
+    "id": "L012",
+    "name": "headcount-floor",
+    "severity": "P2",
+    "summary": "List looks filtered on size rather than scored on it",
+    "origin": "Score size, never filter on it."
+  },
+  {
+    "id": "L013",
+    "name": "duplicate-account",
+    "severity": "P1",
+    "summary": "The same account appears on more than one row",
+    "origin": "Two rows become two reps on one account."
+  },
+  {
+    "id": "L014",
+    "name": "duplicate-phone",
+    "severity": "P1",
+    "summary": "Same phone number appears on multiple accounts",
+    "origin": "A shared main number is the most common enrichment failure."
+  },
+  {
+    "id": "L015",
+    "name": "stale-enrichment",
+    "severity": "P1",
+    "summary": "Enrichment data is older than the configured freshness threshold",
+    "origin": "A list that was clean when built is not clean when sent."
+  },
+  {
+    "id": "L016",
+    "name": "missing-recipient",
+    "severity": "P2",
+    "summary": "Row carries no recipient name at all",
+    "origin": "A nameless row sends to nobody and costs the same."
+  },
+  {
+    "id": "L017",
+    "name": "title-scope",
+    "severity": "P2",
+    "summary": "Title indicates the wrong seniority for the motion",
+    "origin": "An intern cannot sign a contract."
+  },
+  {
+    "id": "L018",
+    "name": "dnc-source-staleness",
+    "severity": "P0",
+    "summary": "DNC source file is older than the configured scrubbing interval",
+    "origin": "A stale DNC list is a historical document, not a compliance tool."
+  },
+  {
+    "id": "L019",
+    "name": "calling-hours",
+    "severity": "P0",
+    "summary": "Send time falls outside legal calling hours for the recipient's jurisdiction",
+    "origin": "Calling-hour windows are an operational safeguard, not legal advice."
+  },
+  {
+    "id": "L020",
+    "name": "email-length",
+    "severity": "P2",
+    "summary": "Copy exceeds 150 words for a first-touch email",
+    "origin": "The goal is a reply, not a pitch."
+  },
+  {
+    "id": "L021",
+    "name": "links-in-first-email",
+    "severity": "P1",
+    "summary": "Copy contains a link or URL in a first-touch email",
+    "origin": "Links trigger spam filters on cold outreach."
+  },
+  {
+    "id": "L022",
+    "name": "multiple-ctas",
+    "severity": "P2",
+    "summary": "Copy contains more than one call-to-action",
+    "origin": "One email, one ask."
+  }
+]
