@@ -5,32 +5,30 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <Nav />
-
-      {/* Single-viewport body */}
-      <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-6 relative z-10 flex flex-col overflow-hidden">
+      <main className="flex-1 max-w-[1180px] w-full mx-auto px-6 py-3 relative z-10 flex flex-col overflow-hidden">
         {/* Hero — compact */}
         <div className="flex-shrink-0">
-          <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-3">
+          <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-2">
             <b className="text-[var(--brand)]">01</b> — A GTM engineering tool
           </p>
-          <h1 className="text-[clamp(28px,4vw,42px)] leading-[1.1] tracking-tight max-w-[24ch]">
+          <h1 className="text-2xl md:text-3xl leading-tight tracking-tight max-w-[24ch]">
             Dedupe and gate every lead list before it ships
           </h1>
-          <p className="text-base text-[var(--body)] max-w-[58ch] leading-relaxed mt-4">
+          <p className="text-sm text-[var(--body)] max-w-[58ch] leading-relaxed mt-2">
             A QA layer for go-to-market engineering. Catches duplicate accounts,
             suppression collisions, DNC hits, restricted jurisdictions, and stale
             enrichment before a single email goes out. One P0 blocks the send.
           </p>
-          <div className="flex flex-wrap gap-3 items-center mt-5">
+          <div className="flex flex-wrap gap-3 items-center mt-3">
             <Link href="/lint"
-              className="inline-flex items-center gap-2 font-bold text-sm uppercase tracking-wider text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-6 py-2.5 rounded-sm transition-colors">
+              className="inline-flex items-center gap-2 font-bold text-sm uppercase tracking-wider text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 py-2 rounded-sm transition-colors">
               Try the linter →
             </Link>
             <a href="https://github.com/alecmurillo/revgate" target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-[var(--body)] border border-[var(--border)] px-4 py-2.5 rounded-sm hover:text-[var(--head)] hover:border-[var(--border-medium)] transition-colors">
+              className="inline-flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-[var(--body)] border border-[var(--border)] px-3 py-2 rounded-sm hover:text-[var(--head)] hover:border-[var(--border-medium)] transition-colors">
               View source
             </a>
-            <div className="flex gap-5 ml-2 text-xs text-[var(--subtle)]">
+            <div className="flex gap-4 ml-1 text-xs text-[var(--subtle)]">
               <span><b className="text-[var(--head)]">22</b> gates</span>
               <span><b className="text-[var(--head)]">27</b> scenarios</span>
               <span><b className="text-[var(--head)]">0</b> deps</span>
@@ -39,14 +37,14 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Two-column: features + droids — fills remaining height */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 min-h-0 overflow-hidden">
+        {/* Two-column: features + droids */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 min-h-0">
           {/* Features */}
           <div className="flex flex-col min-h-0">
-            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-2 flex-shrink-0">
+            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1.5 flex-shrink-0">
               <b className="text-[var(--brand)]">02</b> — What it does
             </p>
-            <div className="grid grid-cols-2 gap-px bg-[var(--border)] border border-[var(--border)] rounded-sm overflow-hidden flex-1">
+            <div className="grid grid-cols-2 gap-px bg-[var(--border)] border border-[var(--border)] rounded-sm flex-1 overflow-y-auto min-h-0">
               <MiniFeature title="Dedupe" desc="Duplicate accounts by domain, duplicate phones, suppression collisions, DNC hits." link="/lint" />
               <MiniFeature title="Gate" desc="Restricted states, merge fields, stale data, headcount ceilings, wrong seniority." />
               <MiniFeature title="Red-team" desc="27 adversarial scenarios against AI sales agents. 21 fail, 6 pass controls." />
@@ -58,17 +56,17 @@ export default function Home() {
 
           {/* Droids */}
           <div className="flex flex-col min-h-0">
-            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-2 flex-shrink-0">
+            <p className="text-xs font-medium tracking-[0.16em] uppercase text-[var(--subtle)] mb-1.5 flex-shrink-0">
               <b className="text-[var(--brand)]">03</b> — What the droids do
             </p>
-            <div className="border border-[var(--border)] rounded-sm bg-[var(--card)] overflow-hidden flex-1 flex flex-col">
-              <p className="text-xs text-[var(--body)] leading-relaxed p-3 border-b border-[var(--border)] flex-shrink-0">
+            <div className="border border-[var(--border)] rounded-sm bg-[var(--card)] flex-1 flex flex-col min-h-0">
+              <p className="text-xs text-[var(--body)] leading-relaxed p-2.5 border-b border-[var(--border)] flex-shrink-0">
                 The 22 gates run with just Python — no account, no network. When you
                 want deeper analysis, <code className="text-[var(--brand)] font-mono">--judge droid</code> spins
                 up parallel AI sessions that review each finding group, find root causes
                 across rules, and cross-check each other's work.
               </p>
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 <DroidPhase phase="0" title="Planning" desc="Group findings by rule. No agent." />
                 <DroidPhase phase="1" title="Pattern gates" desc="22 deterministic gates. The baseline." />
                 <DroidPhase phase="2" title="Parallel review" desc="One droid per rule group, in parallel." />
@@ -80,8 +78,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Invariant — single line at bottom */}
-        <div className="flex-shrink-0 mt-4 pt-3 border-t border-[var(--border)]">
+        {/* Invariant */}
+        <div className="flex-shrink-0 mt-3 pt-2 border-t border-[var(--border)]">
           <p className="text-sm text-[var(--head)]">
             <span className="text-[var(--brand)] font-bold">The invariant:</span>{" "}
             a check that could not run is never a check that passed.
@@ -94,11 +92,11 @@ export default function Home() {
 
 function MiniFeature({ title, desc, link }: { title: string; desc: string; link?: string }) {
   return (
-    <div className="bg-[var(--card)] p-3 hover:bg-[var(--card-2)] transition-colors flex flex-col">
-      <h3 className="text-sm font-bold text-[var(--head)] mb-1">{title}</h3>
+    <div className="bg-[var(--card)] p-2.5 hover:bg-[var(--card-2)] transition-colors flex flex-col">
+      <h3 className="text-sm font-bold text-[var(--head)] mb-0.5">{title}</h3>
       <p className="text-xs text-[var(--body)] leading-relaxed flex-1">{desc}</p>
       {link && (
-        <Link href={link} className="text-xs text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold mt-1.5">
+        <Link href={link} className="text-xs text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold mt-1">
           Upload a CSV →
         </Link>
       )}
@@ -108,7 +106,7 @@ function MiniFeature({ title, desc, link }: { title: string; desc: string; link?
 
 function DroidPhase({ phase, title, desc, highlight, last }: { phase: string; title: string; desc: string; highlight?: boolean; last?: boolean }) {
   return (
-    <div className={`flex gap-3 px-3 py-2.5 ${highlight ? "bg-[var(--brand-soft)]/40" : ""} ${!last ? "border-b border-[var(--border)]" : ""}`}>
+    <div className={`flex gap-3 px-3 py-2 ${highlight ? "bg-[var(--brand-soft)]/40" : ""} ${!last ? "border-b border-[var(--border)]" : ""}`}>
       <span className={`text-xs font-bold tracking-wider pt-0.5 flex-shrink-0 ${highlight ? "text-[var(--brand-strong)]" : "text-[var(--brand)]"}`}>
         {phase}
       </span>
