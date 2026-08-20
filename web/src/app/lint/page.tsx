@@ -50,10 +50,13 @@ export default function LintPage() {
   const runLint = useCallback(async () => {
     if (!file) return;
     setLoading(true); setError(null); setResult(null); setExpandedGroups(new Set());
-    const formData = new FormData();
-    formData.append("file", file); formData.append("today", today);
     try {
-      const res = await fetch("/api/lint", { method: "POST", body: formData });
+      const csvText = await file.text();
+      const res = await fetch("/api/lint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: csvText, today }),
+      });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to run lint");
       else setResult(data as LintResult);
@@ -139,9 +142,9 @@ export default function LintPage() {
             {!file && (
               <div className="mt-6 flex items-center justify-center gap-5 text-xs text-[var(--subtle)]">
                 <span>Try a sample:</span>
-                <button onClick={() => fetch("/api/sample?which=dirty").then(r => r.blob()).then(b => handleFile(new File([b], "leads-dirty.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
+                <button onClick={() => fetch("/leads-dirty.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
                   className="text-red-400 hover:text-red-300 font-bold">leads-dirty.csv</button>
-                <button onClick={() => fetch("/api/sample?which=clean").then(r => r.blob()).then(b => handleFile(new File([b], "leads-clean.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
+                <button onClick={() => fetch("/leads-clean.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
                   className="text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold">leads-clean.csv</button>
               </div>
             )}

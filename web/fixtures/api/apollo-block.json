@@ -1,0 +1,21 @@
+{
+  "source": "apollo",
+  "prospect": {
+    "id": "apt_002",
+    "first_name": "Lisa",
+    "last_name": "Park",
+    "email": "lisa@gmail.com",
+    "phone": "+1 212 555 0100",
+    "title": "Assistant",
+    "organization": {
+      "name": "Zephyr Logistics",
+      "domain": "zephyrlogistics.com",
+      "size": "500",
+      "state": "NY"
+    }
+  },
+  "config": {
+    "restricted_states": ["NY"],
+    "headcount_ceiling": 200
+  }
+}

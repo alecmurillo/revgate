@@ -1,0 +1,18 @@
+{
+  "source": "clay",
+  "rows": [
+    {
+      "_external_id": "clay-row-001",
+      "Company Name": "Acme Logistics",
+      "Domain": "acmelogistics.com",
+      "Email": "ops@acmelogistics.com",
+      "Phone": "+1 415 555 0199",
+      "State": "CA",
+      "Headcount": "45",
+      "Title": "VP of Operations",
+      "Trigger": "opened new distribution center",
+      "Copy": "Saw the new distribution center — congrats on the expansion.",
+      "Enriched Date": "2026-08-01"
+    }
+  ]
+}

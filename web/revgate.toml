@@ -1,0 +1,55 @@
+# revgate configuration.
+#
+# Every path here resolves relative to THIS FILE, not to your shell's working
+# directory, so the same config behaves identically from anywhere in the repo.
+
+[lint]
+# Exit 1 on P1 findings as well as P0. Start false, turn on once the list is clean.
+strict = false
+
+# Rows contacted inside this window are held, whatever the CRM stage says.
+recent_contact_days = 14
+
+# Jurisdictions this motion is not cleared for. Accepts names or two-letter codes.
+# Empty means the gate skips and says so, rather than silently passing.
+restricted_states = ["NY"]
+
+# Size belongs in the score. This is the one explicit exclusion: past this point
+# the motion itself is wrong.
+headcount_exclude_above = 200
+
+# If nothing on the list is smaller than this, the list was probably filtered on
+# size rather than scored on it.
+headcount_floor_warn = 5
+
+# A "trigger" identical on more than this share of rows is a segment label.
+max_trigger_repeat_ratio = 0.5
+
+# Below this row count, distribution claims are noise and get skipped.
+min_rows_for_distribution_checks = 20
+
+[lint.sources]
+# Accounts already in play: CRM export, prior campaign, partner-sourced list.
+# `crm` is accepted as an alias for this key.
+suppression = "fixtures/crm-export.csv"
+
+# Suppressed numbers. A file that exists and parses to zero numbers is treated as
+# a blocking failure, not an empty pass.
+dnc = "fixtures/dnc.csv"
+
+# Declared DNC export date — replaces unreliable file mtime for staleness checks.
+dnc_exported = "2026-08-01"
+
+# Map logical fields onto your own headers when they are not auto-detected.
+# [lint.columns]
+# trigger = "why_now"
+# last_contacted = "notes_last_contacted"
+
+[redteam]
+target = "demo"
+judge = "pattern"
+# judge_model = "claude-sonnet-4-5-20250929"
+
+[provenance]
+manifest = "factory-usage.toml"
+runs_dir = ".revgate/runs"

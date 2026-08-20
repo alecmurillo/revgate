@@ -38,10 +38,14 @@ export default function DiffPage() {
   const runDiff = async () => {
     if (!oldFile || !newFile) return;
     setLoading(true); setError(null); setResult(null); setExpandedGroups(new Set());
-    const formData = new FormData();
-    formData.append("oldFile", oldFile); formData.append("newFile", newFile); formData.append("today", today);
     try {
-      const res = await fetch("/api/diff", { method: "POST", body: formData });
+      const oldCsv = await oldFile.text();
+      const newCsv = await newFile.text();
+      const res = await fetch("/api/diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldCsv, newCsv, today }),
+      });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to run diff");
       else setResult(data as LintResult);
@@ -107,9 +111,9 @@ export default function DiffPage() {
             {error && <div className="mt-3 p-3 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-sm text-red-400">{error}</div>}
             <div className="mt-6 flex items-center justify-center gap-5 text-xs text-[var(--subtle)]">
               <span>Try the fixtures:</span>
-              <button onClick={() => { fetch("/api/sample?which=clean").then(r => r.blob()).then(b => setOldFile(new File([b], "leads-clean.csv", { type: "text/csv" }))).catch(() => {}); }}
+              <button onClick={() => { fetch("/leads-clean.csv").then(r => r.text()).then(t => setOldFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => {}); }}
                 className="text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold">old = clean</button>
-              <button onClick={() => { fetch("/api/sample?which=dirty").then(r => r.blob()).then(b => setNewFile(new File([b], "leads-dirty.csv", { type: "text/csv" }))).catch(() => {}); }}
+              <button onClick={() => { fetch("/leads-dirty.csv").then(r => r.text()).then(t => setNewFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => {}); }}
                 className="text-red-400 hover:text-red-300 font-bold">new = dirty</button>
             </div>
           </>
