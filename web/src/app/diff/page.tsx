@@ -122,12 +122,21 @@ export default function DiffPage() {
               </div>
             )}
             {error && <div className="mt-3 p-3 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-sm text-red-400">{error}</div>}
-            <div className="mt-6 flex items-center justify-center gap-5 text-xs text-[var(--subtle)]">
-              <span>Try the fixtures:</span>
-              <button onClick={() => { fetch("/leads-clean.csv").then(r => r.text()).then(t => setOldFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => {}); }}
-                className="text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold">old = clean</button>
-              <button onClick={() => { fetch("/leads-dirty.csv").then(r => r.text()).then(t => setNewFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => {}); }}
-                className="text-red-400 hover:text-red-300 font-bold">new = dirty</button>
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <p className="text-xs text-[var(--subtle)] uppercase tracking-wider">Or click a sample to load it into a slot:</p>
+              <div className="flex items-center gap-3">
+                <button onClick={() => { fetch("/leads-clean.csv").then(r => r.text()).then(t => setOldFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => {}); }}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[var(--pass-border)] bg-[var(--pass-bg)] text-[var(--brand)] hover:bg-[var(--brand)]/15 hover:border-[var(--brand)]/50 font-bold text-sm transition-all cursor-pointer">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)]" />
+                  Load clean into Old
+                </button>
+                <button onClick={() => { fetch("/leads-dirty.csv").then(r => r.text()).then(t => setNewFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => {}); }}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-red-400 hover:bg-red-500/15 hover:border-red-500/50 font-bold text-sm transition-all cursor-pointer">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  Load dirty into New
+                </button>
+              </div>
+              <p className="text-xs text-[var(--subtle)]">Click both, then hit Compare &amp; re-gate above.</p>
             </div>
           </>
         )}

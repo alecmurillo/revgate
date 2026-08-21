@@ -153,12 +153,22 @@ export default function LintPage() {
             )}
             {error && <div className="mt-3 p-3 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-sm text-red-400 animate-fade-in">{error}</div>}
             {!file && (
-              <div className="mt-6 flex items-center justify-center gap-5 text-xs text-[var(--subtle)]">
-                <span>Try a sample:</span>
-                <button onClick={() => fetch("/leads-dirty.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
-                  className="text-red-400 hover:text-red-300 font-bold">leads-dirty.csv</button>
-                <button onClick={() => fetch("/leads-clean.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
-                  className="text-[var(--brand)] hover:text-[var(--brand-strong)] font-bold">leads-clean.csv</button>
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <p className="text-xs text-[var(--subtle)] uppercase tracking-wider">Or click a sample to load it instantly:</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => fetch("/leads-dirty.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-dirty.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[var(--p0-border)] bg-[var(--p0-bg)] text-red-400 hover:bg-red-500/15 hover:border-red-500/50 font-bold text-sm transition-all cursor-pointer">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    leads-dirty.csv
+                    <span className="text-xs text-[var(--subtle)] font-normal">28 rows, 15 P0</span>
+                  </button>
+                  <button onClick={() => fetch("/leads-clean.csv").then(r => r.text()).then(t => handleFile(new File([t], "leads-clean.csv", { type: "text/csv" }))).catch(() => setError("Could not load sample"))}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[var(--pass-border)] bg-[var(--pass-bg)] text-[var(--brand)] hover:bg-[var(--brand)]/15 hover:border-[var(--brand)]/50 font-bold text-sm transition-all cursor-pointer">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)]" />
+                    leads-clean.csv
+                    <span className="text-xs text-[var(--subtle)] font-normal">28 rows, 0 P0</span>
+                  </button>
+                </div>
               </div>
             )}
           </>
